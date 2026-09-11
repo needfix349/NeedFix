@@ -1,0 +1,1011 @@
+import React, { useState, useEffect } from 'react';
+import {
+  ShieldCheck,
+  CheckCircle2,
+  Clock,
+  XCircle,
+  AlertTriangle,
+  Phone,
+  MessageSquare,
+  Star,
+  Eye,
+  Calendar,
+  MapPin,
+  Edit,
+  Save,
+  Sparkles,
+  User,
+  Power,
+  RefreshCw,
+  Plus,
+  Trash2,
+  Camera,
+  FolderOpen,
+  Image as ImageIcon,
+  Tag,
+  Navigation,
+  Building2,
+} from 'lucide-react';
+import { TechnicianProfile, Review, ActivityLog, TechnicianServiceItem } from '../../types';
+import { storageService } from '../../services/storage';
+import { VerifiedBadge } from '../common/VerifiedBadge';
+import { getCurrentGPSLocation } from '../../services/locationService';
+import { LocationSelectionModal } from '../common/LocationSelectionModal';
+
+interface TechnicianDashboardProps {
+  technician: TechnicianProfile;
+  onOpenEditApplication?: () => void;
+}
+
+export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
+  technician: initialTech,
+  onOpenEditApplication,
+}) => {
+  const [tech, setTech] = useState<TechnicianProfile>(initialTech);
+  const [activeTab, setActiveTab] = useState<'activity' | 'reviews' | 'edit'>('activity');
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  
+  // Profile editing state
+  const [editBio, setEditBio] = useState(initialTech.businessDescription);
+  const [editPrice, setEditPrice] = useState(initialTech.startingPrice);
+  const [editInspectionFee, setEditInspectionFee] = useState(initialTech.inspectionFee || initialTech.startingPrice || 299);
+  const [editPriceUnit, setEditPriceUnit] = useState(initialTech.priceUnit || 'Visiting Fee');
+  const [editHourlyRate, setEditHourlyRate] = useState<number | ''>(initialTech.hourlyRate || '');
+  const [editRateCardNotes, setEditRateCardNotes] = useState(initialTech.rateCardNotes || '');
+  const [editRadius, setEditRadius] = useState<number>(
+    [5, 10, 15, 20].includes(initialTech.coverageRadiusKm) ? initialTech.coverageRadiusKm : 10
+  );
+  const [editCoverageArea, setEditCoverageArea] = useState(initialTech.coverageAreaText);
+  const [editWorkingHours, setEditWorkingHours] = useState(initialTech.workingHours);
+  const [editServices, setEditServices] = useState<TechnicianServiceItem[]>(initialTech.servicesOffered || []);
+  const [newServiceName, setNewServiceName] = useState('');
+  const [newServicePrice, setNewServicePrice] = useState<number>(299);
+  const [newServiceDesc, setNewServiceDesc] = useState('');
+  const [newServicePhotoUrl, setNewServicePhotoUrl] = useState('');
+  const [newServiceFileName, setNewServiceFileName] = useState('');
+  const newServiceFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // For modifying photo on an existing item
+  const [editingPhotoIndex, setEditingPhotoIndex] = useState<number | null>(null);
+  const editItemFileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  const loadData = () => {
+    const updated = storageService.getTechnicianById(initialTech.id);
+    if (updated) setTech(updated);
+    setReviews(storageService.getReviews(initialTech.id));
+    setActivityLogs(storageService.getActivityLogs(initialTech.id));
+  };
+
+  useEffect(() => {
+    loadData();
+    const unsubscribe = storageService.subscribe(loadData);
+    return unsubscribe;
+  }, [initialTech.id]);
+
+  const [isUpdatingGPS, setIsUpdatingGPS] = useState(false);
+  const [gpsUpdateMsg, setGpsUpdateMsg] = useState<string | null>(null);
+  const [showWorkshopLocationModal, setShowWorkshopLocationModal] = useState(false);
+
+  const handleUpdateWorkshopGPS = async () => {
+    setIsUpdatingGPS(true);
+    setGpsUpdateMsg(null);
+    try {
+      const loc = await getCurrentGPSLocation();
+      const updated: TechnicianProfile = {
+        ...tech,
+        location: loc,
+        coverageAreaText: `${loc.area}, ${loc.city}`,
+        businessAddress: loc.address || `${loc.area}, ${loc.city}`,
+      };
+      storageService.updateTechnicianProfile(updated);
+      setTech(updated);
+      setGpsUpdateMsg(`Workshop GPS Pin updated to ${loc.area || loc.city}`);
+      setTimeout(() => setGpsUpdateMsg(null), 4000);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsUpdatingGPS(false);
+    }
+  };
+
+  const handleManualSelectWorkshopLocation = (loc: any) => {
+    const updated: TechnicianProfile = {
+      ...tech,
+      location: loc,
+      coverageAreaText: `${loc.area}, ${loc.city}`,
+      businessAddress: loc.address || `${loc.area}, ${loc.city}`,
+    };
+    storageService.updateTechnicianProfile(updated);
+    setTech(updated);
+    setGpsUpdateMsg(`Workshop Location updated to ${loc.area || loc.city}`);
+    setTimeout(() => setGpsUpdateMsg(null), 4000);
+  };
+
+  const handleToggleOnline = () => {
+    const updated = { ...tech, isOnline: !tech.isOnline };
+    storageService.updateTechnicianProfile(updated);
+    setTech(updated);
+  };
+
+  const handleSendReply = (reviewId: string) => {
+    const reply = replyText[reviewId];
+    if (reply?.trim()) {
+      storageService.replyToReview(reviewId, reply.trim());
+      setReplyText({ ...replyText, [reviewId]: '' });
+    }
+  };
+
+  const handleNewServiceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setNewServiceFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setNewServicePhotoUrl(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEditItemFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || editingPhotoIndex === null) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        const photoUrl = event.target.result as string;
+        setEditServices((prev) =>
+          prev.map((srv, idx) => (idx === editingPhotoIndex ? { ...srv, photoUrl } : srv))
+        );
+        setEditingPhotoIndex(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleAddServiceItem = () => {
+    if (!newServiceName.trim()) return;
+    setEditServices([
+      ...editServices,
+      {
+        id: `srv_${Date.now()}`,
+        name: newServiceName.trim(),
+        price: Number(newServicePrice) || 299,
+        description: newServiceDesc.trim() || undefined,
+        photoUrl: newServicePhotoUrl || undefined,
+      },
+    ]);
+    setNewServiceName('');
+    setNewServicePrice(299);
+    setNewServiceDesc('');
+    setNewServicePhotoUrl('');
+    setNewServiceFileName('');
+  };
+
+  const handleUpdateServicePrice = (index: number, newPrice: number) => {
+    setEditServices((prev) =>
+      prev.map((srv, idx) => (idx === index ? { ...srv, price: newPrice } : srv))
+    );
+  };
+
+  const handleRemoveServiceItem = (index: number) => {
+    setEditServices(editServices.filter((_, i) => i !== index));
+  };
+
+  const handleSaveProfileSettings = (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingProfile(true);
+    const updated: TechnicianProfile = {
+      ...tech,
+      businessDescription: editBio.trim(),
+      startingPrice: Number(editInspectionFee) || Number(editPrice) || 299,
+      inspectionFee: Number(editInspectionFee) || Number(editPrice) || 299,
+      priceUnit: editPriceUnit.trim() || 'Visiting Fee',
+      hourlyRate: editHourlyRate ? Number(editHourlyRate) : undefined,
+      rateCardNotes: editRateCardNotes.trim() || undefined,
+      coverageRadiusKm: Math.min(20, Math.max(5, Number(editRadius))),
+      coverageAreaText: editCoverageArea.trim(),
+      workingHours: editWorkingHours.trim(),
+      servicesOffered: editServices,
+    };
+    storageService.updateTechnicianProfile(updated);
+    setTech(updated);
+    setIsSavingProfile(false);
+    setSaveSuccess(true);
+    setTimeout(() => setSaveSuccess(false), 3000);
+  };
+
+  // Status-dependent variables
+  const isApproved = tech.status === 'approved';
+  const isPending = tech.status === 'pending';
+  const isRejected = tech.status === 'rejected';
+  const isSuspended = tech.status === 'suspended';
+
+  return (
+    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* STATUS HEADER BANNER */}
+      <div
+        className={`rounded-3xl p-6 sm:p-7 border shadow-xl transition-all ${
+          isApproved
+            ? 'bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white border-slate-800'
+            : isPending
+            ? 'bg-gradient-to-r from-amber-950 via-amber-900 to-slate-900 text-white border-amber-800/80'
+            : isRejected
+            ? 'bg-gradient-to-r from-red-950 via-red-900 to-slate-900 text-white border-red-800'
+            : 'bg-gradient-to-r from-slate-900 via-zinc-900 to-slate-950 text-white border-slate-800'
+        }`}
+      >
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+          <div className="flex items-start gap-4">
+            <img
+              src={tech.profilePhotoUrl}
+              alt={tech.fullName}
+              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg shrink-0"
+            />
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-bold font-display text-white">
+                  {tech.fullName}
+                </h1>
+                {isApproved && <VerifiedBadge size="md" />}
+              </div>
+              <p className="text-xs sm:text-sm text-slate-300 font-medium">{tech.companyName}</p>
+              <div className="flex items-center gap-2 text-xs text-blue-200 mt-1 flex-wrap">
+                <span>{tech.categoryName}</span>
+                <span>•</span>
+                <span>{tech.location.city}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Status Controls */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {isApproved && (
+              <button
+                onClick={handleToggleOnline}
+                className={`py-2 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md ${
+                  tech.isOnline
+                    ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30'
+                    : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
+                }`}
+              >
+                <Power size={14} />
+                <span>{tech.isOnline ? '🟢 Accepting Leads (Online)' : '⚪ Paused (Offline)'}</span>
+              </button>
+            )}
+
+            {/* Status Pill */}
+            <div
+              className={`px-3.5 py-1.5 rounded-2xl text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 border shadow-xs ${
+                isApproved
+                  ? 'bg-emerald-950/80 text-emerald-300 border-emerald-700'
+                  : isPending
+                  ? 'bg-amber-950/90 text-amber-300 border-amber-600 animate-pulse'
+                  : isRejected
+                  ? 'bg-red-950 text-red-300 border-red-700'
+                  : 'bg-slate-800 text-slate-300 border-slate-700'
+              }`}
+            >
+              {isApproved && <CheckCircle2 size={15} />}
+              {isPending && <Clock size={15} />}
+              {isRejected && <XCircle size={15} />}
+              {isSuspended && <AlertTriangle size={15} />}
+              <span>
+                {isApproved
+                  ? 'Approved & Live'
+                  : isPending
+                  ? 'Pending Admin Review'
+                  : isRejected
+                  ? 'Application Rejected'
+                  : 'Account Suspended'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Explanation Card */}
+        {isPending && (
+          <div className="mt-4 p-4 rounded-2xl bg-amber-900/40 border border-amber-600/60 text-xs text-amber-100 flex items-start gap-3">
+            <Clock size={20} className="text-amber-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-amber-200 text-sm">Application Status: Pending Admin Review</p>
+              <p className="text-amber-100/90 mt-0.5 leading-relaxed">
+                Your technician registration documents (National ID Aadhaar card) are currently being reviewed by the NeedFix administration team.
+                Until approved, your profile will remain hidden from customer search results to prevent unverified listings.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {isRejected && (
+          <div className="mt-4 p-4 rounded-2xl bg-red-900/40 border border-red-600/60 text-xs text-red-100 flex items-start gap-3">
+            <XCircle size={20} className="text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-bold text-red-200 text-sm">Application Rejected</p>
+              <p className="text-red-100/90 mt-0.5">
+                Admin feedback: <span className="font-medium text-white">{tech.rejectionReason || 'Documents could not be verified'}</span>
+              </p>
+              {onOpenEditApplication && (
+                <button
+                  type="button"
+                  onClick={onOpenEditApplication}
+                  className="mt-2 py-1.5 px-3 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold"
+                >
+                  Resubmit Updated Application
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* METRIC KPI COUNTERS */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
+            <span>Incoming Calls</span>
+            <Phone size={16} className="text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 font-mono">{tech.totalCalls || 0}</p>
+          <span className="text-[10px] text-slate-400">Direct phone taps</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
+            <span>WhatsApp Clicks</span>
+            <MessageSquare size={16} className="text-emerald-600" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 font-mono">{tech.totalWhatsAppClicks || 0}</p>
+          <span className="text-[10px] text-slate-400">Chat requests</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
+            <span>Profile Views</span>
+            <Eye size={16} className="text-purple-600" />
+          </div>
+          <p className="text-2xl font-bold text-slate-900 font-mono">{tech.profileViews || 0}</p>
+          <span className="text-[10px] text-slate-400">Customer views</span>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs">
+          <div className="flex items-center justify-between text-slate-500 text-xs mb-1">
+            <span>Rating & Reviews</span>
+            <Star size={16} className="text-amber-500 fill-amber-500" />
+          </div>
+          <div className="flex items-baseline gap-1.5">
+            <p className="text-2xl font-bold text-slate-900 font-mono">{tech.rating > 0 ? tech.rating : 'N/A'}</p>
+            <span className="text-xs text-slate-400">({reviews.length})</span>
+          </div>
+          <span className="text-[10px] text-amber-700 font-medium">Customer score</span>
+        </div>
+      </div>
+
+      {/* DASHBOARD TABS & CONTENT */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        {/* Tab Headers */}
+        <div className="flex items-center border-b border-slate-200 px-4 pt-3 overflow-x-auto gap-1">
+          <button
+            onClick={() => setActiveTab('activity')}
+            className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'activity'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Phone size={14} />
+            <span>Calls & WhatsApp Logs ({activityLogs.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'reviews'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Star size={14} />
+            <span>Reviews & Ratings ({reviews.length})</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('edit')}
+            className={`py-2.5 px-4 font-bold text-xs rounded-t-xl transition-all border-b-2 flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'edit'
+                ? 'border-blue-600 text-blue-700 bg-blue-50/50'
+                : 'border-transparent text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            <Tag size={14} />
+            <span>Services, Rates & Photos ({editServices.length})</span>
+          </button>
+        </div>
+
+        <div className="p-5 sm:p-6">
+          {/* TAB 1: CALL & WHATSAPP LOGS */}
+          {activeTab === 'activity' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">Direct Calls & WhatsApp Inquiry Logs</h3>
+                <span className="text-xs text-slate-500">Real-time customer engagement tracker</span>
+              </div>
+
+              {activityLogs.length === 0 ? (
+                <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <Phone size={32} className="mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-bold text-slate-700">No contact activity recorded yet</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    When customers tap "Call Technician" or "WhatsApp Chat" on your verified card, events will log here.
+                  </p>
+                </div>
+              ) : (
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
+                  {activityLogs.map((log) => (
+                    <div
+                      key={log.id}
+                      className="p-3.5 bg-white hover:bg-slate-50 flex items-center justify-between gap-3 text-xs"
+                    >
+                      <div className="flex items-center gap-3">
+                        <span
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
+                            log.type === 'call'
+                              ? 'bg-blue-100 text-blue-700'
+                              : log.type === 'whatsapp'
+                              ? 'bg-emerald-100 text-emerald-700'
+                              : 'bg-purple-100 text-purple-700'
+                          }`}
+                        >
+                          {log.type === 'call' ? <Phone size={14} /> : log.type === 'whatsapp' ? <MessageSquare size={14} /> : <Eye size={14} />}
+                        </span>
+                        <div>
+                          <p className="font-bold text-slate-900">
+                            {log.type === 'call'
+                              ? 'Direct Phone Call Tap'
+                              : log.type === 'whatsapp'
+                              ? 'WhatsApp Chat Launch'
+                              : 'Profile Viewed'}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Customer: {log.customerName || 'Anonymous Customer'} {log.customerPhone ? `(${log.customerPhone})` : ''}
+                          </p>
+                        </div>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-mono">
+                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.timestamp).toLocaleDateString()}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: RATINGS & REVIEWS */}
+          {activeTab === 'reviews' && (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-bold text-slate-900">Customer Ratings & Feedback</h3>
+                <div className="flex items-center gap-1 text-xs font-bold text-amber-600 bg-amber-50 px-2.5 py-1 rounded-xl border border-amber-200">
+                  <Star size={14} className="fill-amber-500 text-amber-500" />
+                  <span>{tech.rating > 0 ? `${tech.rating} / 5.0` : 'No ratings yet'} ({reviews.length} reviews)</span>
+                </div>
+              </div>
+
+              {reviews.length === 0 ? (
+                <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <Star size={32} className="mx-auto text-slate-400 mb-2" />
+                  <p className="text-sm font-bold text-slate-700">No reviews received yet</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Customer ratings and feedback from direct calls and service requests will show up here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {reviews.map((rev) => (
+                    <div key={rev.id} className="p-4 rounded-2xl border border-slate-200 bg-slate-50/50 space-y-2.5">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <img
+                            src={rev.customerAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
+                            alt={rev.customerName}
+                            className="w-8 h-8 rounded-full object-cover border border-slate-200"
+                          />
+                          <div>
+                            <span className="font-bold text-xs text-slate-900">{rev.customerName}</span>
+                            <span className="text-[11px] text-slate-400 block">{rev.serviceUsed}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-0.5 text-amber-500">
+                          {Array.from({ length: rev.rating }).map((_, i) => (
+                            <Star key={i} size={13} className="fill-amber-400 text-amber-400" />
+                          ))}
+                        </div>
+                      </div>
+
+                      <p className="text-xs text-slate-700 leading-relaxed italic">
+                        "{rev.comment}"
+                      </p>
+
+                      {/* Reply section */}
+                      {rev.technicianReply ? (
+                        <div className="p-2.5 bg-blue-50/80 rounded-xl border border-blue-200/60 text-xs">
+                          <span className="font-bold text-blue-900 text-[11px]">Your Reply:</span>
+                          <p className="text-blue-950 mt-0.5">{rev.technicianReply}</p>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 pt-1">
+                          <input
+                            type="text"
+                            placeholder="Write a polite reply to this customer..."
+                            value={replyText[rev.id] || ''}
+                            onChange={(e) => setReplyText({ ...replyText, [rev.id]: e.target.value })}
+                            className="flex-1 px-3 py-1.5 text-xs bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleSendReply(rev.id)}
+                            className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-semibold"
+                          >
+                            Reply
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 4: EDIT PROFILE & SERVICES */}
+          {activeTab === 'edit' && (
+            <form onSubmit={handleSaveProfileSettings} className="space-y-4 max-w-2xl">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                <h3 className="text-sm font-bold text-slate-900">Profile & Service Rates Settings</h3>
+                {saveSuccess && (
+                  <span className="text-xs text-emerald-700 font-bold bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-300 flex items-center gap-1">
+                    <CheckCircle2 size={13} /> Saved Successfully
+                  </span>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Business Description / Bio
+                </label>
+                <textarea
+                  rows={3}
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  className="w-full p-3 bg-slate-50 border border-slate-300 rounded-2xl text-xs outline-none focus:border-blue-600"
+                />
+              </div>
+
+              {/* Coverage Radius & Working Hours */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>🎯 Service Coverage Radius</span>
+                      <span className="text-[10px] text-slate-500 font-normal">(1 km - 20 km)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200 text-xs">
+                      {editRadius} km
+                    </span>
+                  </div>
+
+                  {/* Smooth Range Slider (1 to 20 km, step 1) */}
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    step={1}
+                    value={editRadius}
+                    onChange={(e) => setEditRadius(Number(e.target.value))}
+                    className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                  />
+
+                  {/* Quick Preset Buttons */}
+                  <div className="flex items-center justify-between gap-1.5">
+                    {[1, 3, 5, 10, 15, 20].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setEditRadius(step)}
+                        className={`flex-1 py-1 px-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          editRadius === step
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {step} km
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
+                    <span>1 km (Neighborhood)</span>
+                    <span>10 km (Standard)</span>
+                    <span>20 km (Max Radius)</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                    Working Hours
+                  </label>
+                  <input
+                    type="text"
+                    value={editWorkingHours}
+                    onChange={(e) => setEditWorkingHours(e.target.value)}
+                    className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium outline-none focus:border-blue-600"
+                  />
+                  <span className="text-[10px] text-slate-500 mt-1 block">
+                    e.g. 08:30 AM - 08:30 PM (All Days)
+                  </span>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1">
+                  Service Localities & Coverage Text
+                </label>
+                <input
+                  type="text"
+                  value={editCoverageArea}
+                  onChange={(e) => setEditCoverageArea(e.target.value)}
+                  className="w-full p-2.5 bg-slate-50 border border-slate-300 rounded-xl text-xs font-medium outline-none"
+                />
+              </div>
+
+              {/* Workshop GPS Pin Radar Card */}
+              <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="p-1.5 bg-blue-600 text-white rounded-xl">
+                      <MapPin size={16} />
+                    </span>
+                    <div>
+                      <h4 className="text-xs font-bold text-slate-900">
+                        Workshop GPS Pin (Active)
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-mono">
+                        Lat: {tech.location.latitude.toFixed(5)}°, Lng: {tech.location.longitude.toFixed(5)}°
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleUpdateWorkshopGPS}
+                      disabled={isUpdatingGPS}
+                      title="Auto Update Workshop GPS Pin"
+                      className="py-1.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                    >
+                      {isUpdatingGPS ? (
+                        <>
+                          <RefreshCw size={13} className="animate-spin text-amber-300" />
+                          <span>Updating GPS...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Navigation size={13} className="text-white fill-white" />
+                          <span>Auto GPS Pin</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowWorkshopLocationModal(true)}
+                      title="Manual Location Selection / Pinning"
+                      className="py-1.5 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                    >
+                      <Building2 size={13} className="text-blue-600" />
+                      <span>Manual Pin</span>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white p-2 rounded-xl border border-blue-100 text-[11px] text-slate-700">
+                  <span className="font-semibold text-slate-800">
+                    📍 {tech.location.address || `${tech.location.area}, ${tech.location.city}`}
+                  </span>
+                </div>
+
+                {gpsUpdateMsg && (
+                  <div className="text-xs text-emerald-700 font-bold flex items-center gap-1 bg-emerald-100/80 px-2.5 py-1 rounded-lg">
+                    <CheckCircle2 size={13} />
+                    <span>{gpsUpdateMsg}</span>
+                  </div>
+                )}
+
+                {/* Native GPS Coordinates & Coverage Status */}
+                <div className="mt-3 pt-2.5 border-t border-blue-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div>
+                    <span className="font-bold text-slate-800">
+                      GPS Coordinates:
+                    </span>{' '}
+                    <span className="font-mono text-slate-600">
+                      {tech.location.latitude.toFixed(5)}°N, {tech.location.longitude.toFixed(5)}°E
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] font-bold bg-blue-100 text-blue-800 px-2 py-0.5 rounded-md">
+                      {tech.coverageRadiusKm} km coverage
+                    </span>
+                    <span className="text-[11px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <CheckCircle2 size={11} className="text-emerald-600" />
+                      Active
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Hidden file inputs for work photos */}
+              <input
+                ref={newServiceFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleNewServiceFileChange}
+              />
+              <input
+                ref={editItemFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleEditItemFileChange}
+              />
+
+              {/* Service Items & Price Rate Card */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                      Work Catalog & Price List (काम और रेट लिस्ट)
+                    </label>
+                    <p className="text-[11px] text-slate-500">
+                      Mention the exact work name, standard price (₹), and a photo of your work.
+                    </p>
+                  </div>
+                  <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                    {editServices.length} Services Listed
+                  </span>
+                </div>
+
+                {/* Existing Services List */}
+                <div className="space-y-2.5 mb-4">
+                  {editServices.map((srv, idx) => (
+                    <div
+                      key={srv.id || idx}
+                      className="p-3 bg-slate-50 hover:bg-slate-100/80 transition-colors rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
+                    >
+                      {/* Work Photo & Title */}
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        {/* Service Photo Thumbnail with Click to Change */}
+                        <div
+                          onClick={() => {
+                            setEditingPhotoIndex(idx);
+                            editItemFileInputRef.current?.click();
+                          }}
+                          className="relative w-14 h-14 rounded-xl overflow-hidden bg-slate-200 border border-slate-300 shrink-0 cursor-pointer group shadow-2xs"
+                          title="Click to change work photo"
+                        >
+                          {srv.photoUrl ? (
+                            <img
+                              src={srv.photoUrl}
+                              alt={srv.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex flex-col items-center justify-center text-slate-400 bg-slate-100">
+                              <ImageIcon size={18} />
+                              <span className="text-[9px] mt-0.5">No photo</span>
+                            </div>
+                          )}
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px] font-bold">
+                            <Camera size={16} />
+                          </div>
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <p className="font-bold text-slate-900 text-xs break-words">{srv.name}</p>
+                          {srv.description && (
+                            <p className="font-medium text-[11px] text-slate-600 break-words mt-0.5">{srv.description}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingPhotoIndex(idx);
+                              editItemFileInputRef.current?.click();
+                            }}
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1"
+                          >
+                            <Camera size={10} />
+                            <span>{srv.photoUrl ? 'Change Work Photo' : '+ Add Work Photo'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Price & Actions */}
+                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                        <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-slate-300">
+                          <span className="font-bold text-slate-600 font-mono">₹</span>
+                          <input
+                            type="number"
+                            value={srv.price}
+                            onChange={(e) => handleUpdateServicePrice(idx, Number(e.target.value))}
+                            className="w-16 font-mono font-bold text-slate-900 text-xs outline-none"
+                            placeholder="Price"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveServiceItem(idx)}
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
+                          title="Remove service"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {editServices.length === 0 && (
+                    <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 text-xs">
+                      No services listed yet. Add your first service below with price and photo.
+                    </div>
+                  )}
+                </div>
+
+                {/* Add New Work / Service with Price and Photo */}
+                <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
+                  <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
+                    <Plus size={15} className="text-blue-600" />
+                    <span>Add New Work Service (नया काम, रेट और फोटो जोड़ें)</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div className="sm:col-span-2">
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Work / Service Name *
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Inverter Split AC Jet Wash & Gas Check"
+                        value={newServiceName}
+                        onChange={(e) => setNewServiceName(e.target.value)}
+                        className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                        Price (₹) *
+                      </label>
+                      <div className="relative">
+                        <span className="absolute left-3 top-2.5 text-slate-500 font-mono font-bold text-xs">₹</span>
+                        <input
+                          type="number"
+                          placeholder="499"
+                          value={newServicePrice}
+                          onChange={(e) => setNewServicePrice(Number(e.target.value))}
+                          className="w-full pl-7 p-2.5 text-xs bg-white border border-slate-300 rounded-xl outline-none font-mono font-bold focus:border-blue-600"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Short Description / What is Included (Optional)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Includes indoor & outdoor jet clean, coil wash, cooling check"
+                      value={newServiceDesc}
+                      onChange={(e) => setNewServiceDesc(e.target.value)}
+                      className="w-full p-2 text-xs bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600"
+                    />
+                  </div>
+
+                  {/* Work Photo Upload */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
+                      Work Photo (काम का फोटो अपलोड करें)
+                    </label>
+                    <div className="flex flex-wrap items-center gap-3">
+                      {newServicePhotoUrl ? (
+                        <div className="relative w-14 h-14 rounded-xl overflow-hidden border-2 border-blue-600 bg-white shadow-xs">
+                          <img
+                            src={newServicePhotoUrl}
+                            alt="Work preview"
+                            className="w-full h-full object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setNewServicePhotoUrl('');
+                              setNewServiceFileName('');
+                            }}
+                            className="absolute top-0.5 right-0.5 bg-red-600 text-white p-0.5 rounded-full"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        </div>
+                      ) : null}
+
+                      <button
+                        type="button"
+                        onClick={() => newServiceFileInputRef.current?.click()}
+                        className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <FolderOpen size={14} className="text-blue-600" />
+                        <span>{newServicePhotoUrl ? 'Change Photo' : 'Upload from Gallery'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => newServiceFileInputRef.current?.click()}
+                        className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                      >
+                        <Camera size={14} className="text-slate-500" />
+                        <span>Camera</span>
+                      </button>
+
+                      <span className="text-[11px] text-slate-500">
+                        {newServiceFileName ? `📁 ${newServiceFileName}` : '(Gallery या Camera से फोटो लें)'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleAddServiceItem}
+                      disabled={!newServiceName.trim()}
+                      className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
+                    >
+                      <Plus size={14} />
+                      <span>Add to Service Menu (काम जोड़ें)</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pt-3">
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="py-3 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 shadow-md shadow-blue-600/20"
+                >
+                  <Save size={14} />
+                  <span>{isSavingProfile ? 'Saving Changes...' : 'Save Profile & Services'}</span>
+                </button>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+
+      {/* Workshop Location Selection Modal (Unified Map & GPS Pinning) */}
+      {showWorkshopLocationModal && (
+        <LocationSelectionModal
+          isOpen={showWorkshopLocationModal}
+          onClose={() => setShowWorkshopLocationModal(false)}
+          currentLocation={tech.location}
+          onSelectLocation={handleManualSelectWorkshopLocation}
+        />
+      )}
+    </div>
+  );
+};

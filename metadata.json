@@ -1,0 +1,6 @@
+{
+  "name": "NeedFix - Services & Technician Platform",
+  "description": "Direct Call and WhatsApp on-demand doorstep service network across 22 service categories with Aadhaar-verified technicians, fixed rate lists, and 24/7 administrator support.",
+  "requestFramePermissions": ["geolocation", "camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

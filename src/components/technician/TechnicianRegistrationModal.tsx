@@ -1,0 +1,1362 @@
+import React, { useState, useRef } from 'react';
+import {
+  X,
+  ShieldCheck,
+  CheckCircle2,
+  Building,
+  Briefcase,
+  MapPin,
+  FileText,
+  Phone,
+  ArrowRight,
+  ArrowLeft,
+  Sparkles,
+  Info,
+  Check,
+  Store,
+  Upload,
+  Image as ImageIcon,
+  Camera,
+  Trash2,
+  FileCheck,
+  FolderOpen,
+  AlertCircle,
+  Navigation,
+  RefreshCw,
+  Building2,
+} from 'lucide-react';
+import { UserProfile, TechnicianProfile, UserLocation } from '../../types';
+import { SERVICE_CATEGORIES } from '../../data/categories';
+import { CategoryLogo } from '../common/CategoryLogo';
+import { storageService } from '../../services/storage';
+import { supabaseService } from '../../services/supabaseService';
+import { getCurrentGPSLocation, DEFAULT_USER_LOCATION } from '../../services/locationService';
+import { GuidedAadhaarKYCModal } from '../kyc/GuidedAadhaarKYCModal';
+
+interface TechnicianRegistrationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  currentUser: UserProfile;
+  onSubmitted: (submittedProfile: TechnicianProfile) => void;
+}
+
+export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalProps> = ({
+  isOpen,
+  onClose,
+  currentUser,
+  onSubmitted,
+}) => {
+  const [currentStep, setCurrentStep] = useState<1 | 2 | 3>(1);
+
+  // 1. Business / Store / Company & Contact Details
+  const [companyName, setCompanyName] = useState('');
+  const [mobile, setMobile] = useState(currentUser.mobile || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(currentUser.mobile || '');
+  const [sameAsMobile, setSameAsMobile] = useState(true);
+  const [workshopLocation, setWorkshopLocation] = useState<UserLocation | null>(
+    currentUser.location || null
+  );
+  const [isLocatingGPS, setIsLocatingGPS] = useState(false);
+  const [gpsLockSuccess, setGpsLockSuccess] = useState(false);
+  const [gpsLockError, setGpsLockError] = useState<string | null>(null);
+
+  // Automatically fetch current location on map when technician opens location setup
+  React.useEffect(() => {
+    if (isOpen) {
+      if (!workshopLocation) {
+        setIsLocatingGPS(true);
+        setGpsLockError(null);
+        getCurrentGPSLocation()
+          .then((loc) => {
+            setWorkshopLocation(loc);
+            setGpsLockSuccess(true);
+          })
+          .catch((err) => {
+            console.warn('Notice: GPS auto-detect fallback:', err);
+            setWorkshopLocation(currentUser.location || DEFAULT_USER_LOCATION);
+          })
+          .finally(() => {
+            setIsLocatingGPS(false);
+          });
+      }
+    }
+  }, [isOpen]);
+
+  const handleFetchCurrentLocation = async () => {
+    setIsLocatingGPS(true);
+    setGpsLockError(null);
+    setGpsLockSuccess(false);
+    try {
+      const loc = await getCurrentGPSLocation();
+      setWorkshopLocation(loc);
+      setGpsLockSuccess(true);
+      setTimeout(() => setGpsLockSuccess(false), 4000);
+    } catch (err: any) {
+      setGpsLockError('Could not fetch GPS coordinates. Please ensure location permission is allowed in your browser.');
+    } finally {
+      setIsLocatingGPS(false);
+    }
+  };
+
+  const [coverageRadiusKm, setCoverageRadiusKm] = useState(10);
+  const [businessDescription, setBusinessDescription] = useState('');
+
+  // 2. Multi-Trade / Skills Selection (Technician can select 2, 3, or more trades)
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([
+    SERVICE_CATEGORIES[0].id,
+  ]);
+
+  // 3. Store / Company Photo / Logo (Gallery / Camera Upload)
+  const [companyLogoUrl, setCompanyLogoUrl] = useState('');
+  const [logoFileName, setLogoFileName] = useState<string>('');
+  const [logoLoadError, setLogoLoadError] = useState<boolean>(false);
+  const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+
+  // 4. Mandatory Google OAuth Verification for Technicians
+  const [googleEmail, setGoogleEmail] = useState(currentUser.email || '');
+  const [isGoogleVerified, setIsGoogleVerified] = useState(
+    Boolean(currentUser.email && currentUser.email.includes('@'))
+  );
+  const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
+
+  // 5. Mandatory Aadhaar Details (12-Digit UID + Dual-Side Document Upload)
+  const [aadhaarNumber, setAadhaarNumber] = useState('');
+  const [aadhaarDocUrl, setAadhaarDocUrl] = useState<string>('');
+  const [aadhaarBackDocUrl, setAadhaarBackDocUrl] = useState<string>('');
+  const [aadhaarFileName, setAadhaarFileName] = useState<string>('');
+  const [aadhaarBackFileName, setAadhaarBackFileName] = useState<string>('');
+  const [aadhaarFile, setAadhaarFile] = useState<File | null>(null);
+  const [aadhaarBackFile, setAadhaarBackFile] = useState<File | null>(null);
+  const [showAadhaarUrlInput, setShowAadhaarUrlInput] = useState(false);
+  const [isGuidedKYCOpen, setIsGuidedKYCOpen] = useState<boolean>(false);
+  const [isGuidedKYCComplete, setIsGuidedKYCComplete] = useState<boolean>(false);
+  const aadhaarFrontFileInputRef = useRef<HTMLInputElement>(null);
+  const aadhaarBackFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Status Indicators for Dual-Side Aadhaar KYC
+  const isFrontCaptured = Boolean(aadhaarDocUrl && aadhaarDocUrl.trim());
+  const isBackCaptured = Boolean(aadhaarBackDocUrl && aadhaarBackDocUrl.trim());
+  const isAadhaarComplete = isFrontCaptured && isBackCaptured;
+
+  const [hasAgreedTerms, setHasAgreedTerms] = useState(true);
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Google OAuth triggers for Service Providers
+  const handleGoogleSignInForTechnician = async () => {
+    setIsGoogleAuthLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await supabaseService.signInWithGoogle({
+        customEmail: 'needfix349@gmail.com',
+        customName: companyName || currentUser.name || 'Verified Technician',
+        rolePreference: 'technician',
+      });
+      if (res.user?.email) {
+        setGoogleEmail(res.user.email);
+        setIsGoogleVerified(true);
+      }
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Google verification failed.');
+    } finally {
+      setIsGoogleAuthLoading(false);
+    }
+  };
+
+  const handleInstantDemoGoogleVerify = () => {
+    const verifiedUser = storageService.syncGoogleUser({
+      uid: `supa_tech_${Date.now()}`,
+      email: 'needfix349@gmail.com',
+      displayName: companyName || currentUser.name || 'Verified Technician (Google)',
+      photoURL:
+        currentUser.avatarUrl ||
+        'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
+      role: 'technician',
+    });
+    setGoogleEmail('needfix349@gmail.com');
+    setIsGoogleVerified(true);
+    storageService.setCurrentUser(verifiedUser);
+    setErrorMessage(null);
+  };
+
+  if (!isOpen) return null;
+
+  // Handle Shop Logo File Upload from Gallery/Camera
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setErrorMessage('Please select a valid image file (JPG, PNG, WebP) for the store logo.');
+      return;
+    }
+    if (file.size > 8 * 1024 * 1024) {
+      setErrorMessage('Store logo image must be under 8MB in size.');
+      return;
+    }
+    setLogoFileName(file.name);
+    setLogoLoadError(false);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setCompanyLogoUrl(event.target.result as string);
+        setLogoLoadError(false);
+        setErrorMessage(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Aadhaar Card Front Photo Upload from Gallery/Camera
+  const handleAadhaarFrontFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      setErrorMessage('Please select a clear Aadhaar Front card photo (JPG, PNG) or PDF document.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage('Aadhaar document file must be under 10MB in size.');
+      return;
+    }
+    setAadhaarFileName(file.name);
+    setAadhaarFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setAadhaarDocUrl(event.target.result as string);
+        setErrorMessage(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Handle Aadhaar Card Back Photo Upload from Gallery/Camera
+  const handleAadhaarBackFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/') && file.type !== 'application/pdf') {
+      setErrorMessage('Please select a clear Aadhaar Back card photo (JPG, PNG) or PDF document.');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage('Aadhaar document file must be under 10MB in size.');
+      return;
+    }
+    setAadhaarBackFileName(file.name);
+    setAadhaarBackFile(file);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setAadhaarBackDocUrl(event.target.result as string);
+        setErrorMessage(null);
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // Single streamlined Gallery upload helper (routes to missing side or front)
+  const handleGalleryUploadClick = () => {
+    if (!aadhaarDocUrl) {
+      aadhaarFrontFileInputRef.current?.click();
+    } else if (!aadhaarBackDocUrl) {
+      aadhaarBackFileInputRef.current?.click();
+    } else {
+      aadhaarFrontFileInputRef.current?.click();
+    }
+  };
+
+  // Sample demo Aadhaar dual-side filler for quick evaluation
+  const handleUseSampleAadhaar = () => {
+    setAadhaarDocUrl(
+      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
+    );
+    setAadhaarBackDocUrl(
+      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80'
+    );
+    setAadhaarFileName('Sample-Aadhaar-Front.jpg');
+    setAadhaarBackFileName('Sample-Aadhaar-Back.jpg');
+    if (!aadhaarNumber) {
+      setAadhaarNumber('5432 8901 2345');
+    }
+    setIsGuidedKYCComplete(true);
+    setErrorMessage(null);
+  };
+
+  // Clear all Aadhaar KYC documents
+  const handleClearAadhaar = () => {
+    setAadhaarDocUrl('');
+    setAadhaarBackDocUrl('');
+    setAadhaarFileName('');
+    setAadhaarBackFileName('');
+    setAadhaarFile(null);
+    setAadhaarBackFile(null);
+    setIsGuidedKYCComplete(false);
+  };
+
+  const toggleCategory = (catId: string) => {
+    if (selectedCategoryIds.includes(catId)) {
+      if (selectedCategoryIds.length === 1) {
+        setErrorMessage('Please select at least 1 service trade.');
+        return;
+      }
+      setSelectedCategoryIds(selectedCategoryIds.filter((id) => id !== catId));
+    } else {
+      setSelectedCategoryIds([...selectedCategoryIds, catId]);
+    }
+    setErrorMessage(null);
+  };
+
+  const handleNext = (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    if (currentStep === 1) {
+      if (!isGoogleVerified || !googleEmail) {
+        setErrorMessage(
+          'Google Sign-In (Gmail authentication) is required before registering as a service provider.'
+        );
+        return;
+      }
+      if (!companyName.trim()) {
+        setErrorMessage('Please enter your Shop / Store / Company Name.');
+        return;
+      }
+      if (!mobile.trim() || !whatsappNumber.trim()) {
+        setErrorMessage('Please enter valid mobile and WhatsApp numbers.');
+        return;
+      }
+      if (!workshopLocation) {
+        setErrorMessage('Please click "Fetch Current Location" to set your workshop GPS coordinates.');
+        return;
+      }
+      setCurrentStep(2);
+    } else if (currentStep === 2) {
+      if (selectedCategoryIds.length === 0) {
+        setErrorMessage('Please select at least one skill/trade.');
+        return;
+      }
+      setCurrentStep(3);
+    }
+  };
+
+  const handleFinalSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+
+    const cleanAadhaar = aadhaarNumber.replace(/\D/g, '');
+    if (!cleanAadhaar || cleanAadhaar.length !== 12) {
+      setErrorMessage('Please enter a valid 12-digit Aadhaar number for identity verification.');
+      return;
+    }
+
+    // Aadhaar Card Front and Back Photos are strictly mandatory
+    if (!aadhaarDocUrl || !aadhaarDocUrl.trim()) {
+      setErrorMessage('Aadhaar Front Side photo is required. Please launch guided camera or upload from gallery.');
+      return;
+    }
+    if (!aadhaarBackDocUrl || !aadhaarBackDocUrl.trim()) {
+      setErrorMessage('Aadhaar Back Side photo is required. Please launch guided camera or upload from gallery.');
+      return;
+    }
+    if (!companyLogoUrl || !companyLogoUrl.trim()) {
+      setErrorMessage('Please upload a store or company logo photo.');
+      return;
+    }
+    if (!hasAgreedTerms) {
+      setErrorMessage('Please accept the verification terms to proceed.');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    const selectedCategories = SERVICE_CATEGORIES.filter((c) =>
+      selectedCategoryIds.includes(c.id)
+    );
+    const primaryCat = selectedCategories[0] || SERVICE_CATEGORIES[0];
+
+    const categoryNames = selectedCategories.map((c) => c.name);
+
+    // Build standard services list based on selected trades
+    const servicesOffered: { name: string; price: number; description?: string }[] = [];
+    selectedCategories.forEach((cat) => {
+      cat.popularServices.forEach((srv, idx) => {
+        servicesOffered.push({
+          name: `${srv} (${cat.name})`,
+          price: 299 + idx * 100,
+        });
+      });
+    });
+
+    let finalAadhaarDocUrl = aadhaarDocUrl.trim();
+    if (aadhaarFile) {
+      try {
+        finalAadhaarDocUrl = await supabaseService.uploadAadhaarDocument(
+          aadhaarFile,
+          currentUser.id,
+          aadhaarFileName
+        );
+      } catch (uploadErr) {
+        console.warn('Aadhaar upload to Supabase storage warning:', uploadErr);
+      }
+    }
+
+    let finalAadhaarBackDocUrl = aadhaarBackDocUrl.trim();
+    if (aadhaarBackFile) {
+      try {
+        finalAadhaarBackDocUrl = await supabaseService.uploadKYCDocument(
+          aadhaarBackFile,
+          currentUser.id,
+          'aadhaar',
+          'back',
+          aadhaarBackFileName || 'Aadhaar-Back-Document.jpg'
+        );
+      } catch (uploadBackErr) {
+        console.warn('Aadhaar back upload to Supabase storage warning:', uploadBackErr);
+      }
+    }
+
+    const applicationData = {
+      userId: currentUser.id,
+      fullName: companyName.trim(), // Use Store/Company name as primary identity
+      mobile: mobile.trim(),
+      whatsappNumber: whatsappNumber.trim(),
+      companyName: companyName.trim(),
+      categoryId: primaryCat.id,
+      categoryName: primaryCat.name,
+      categoryIds: selectedCategoryIds,
+      categoryNames: categoryNames,
+      experienceYears: 5,
+      coverageRadiusKm: Number(coverageRadiusKm),
+      coverageAreaText: `${workshopLocation?.area || 'Local Area'}, ${workshopLocation?.city || 'Delhi'}`,
+      businessAddress: workshopLocation?.address || `${workshopLocation?.area || ''}, ${workshopLocation?.city || ''}`,
+      location: workshopLocation || {
+        latitude: 28.6139,
+        longitude: 77.2090,
+        city: 'Delhi',
+        area: 'Central',
+        address: 'Auto GPS Location',
+      },
+      businessDescription:
+        businessDescription.trim() ||
+        `${companyName} offers expert services for ${categoryNames.join(
+          ', '
+        )} with verified tools, genuine parts, and satisfaction guarantee.`,
+      profilePhotoUrl: companyLogoUrl.trim(),
+      companyLogoUrl: companyLogoUrl.trim(),
+      portfolioImages: [],
+      documents: {
+        aadhaarNumber: cleanAadhaar,
+        aadhaarDocUrl: finalAadhaarDocUrl,
+        aadhaarBackDocUrl: finalAadhaarBackDocUrl || undefined,
+        kyc_status: 'pending_verification' as const,
+      },
+      startingPrice: 299,
+      priceUnit: 'Visiting Fee',
+      inspectionFee: 299,
+      hourlyRate: undefined,
+      rateCardNotes: undefined,
+      servicesOffered: servicesOffered.slice(0, 8),
+      workingHours: '08:30 AM - 08:30 PM (All Days)',
+      availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+      isOnline: false, // Default offline until Admin approval
+    };
+
+    const newProfile = await supabaseService.submitTechnicianApplication(applicationData);
+
+    // Update currentUser state to technician with verified email
+    const updatedUser: UserProfile = {
+      ...currentUser,
+      role: 'technician',
+      email: googleEmail || currentUser.email || 'needfix349@gmail.com',
+      isTechnicianRegistered: true,
+    };
+    storageService.setCurrentUser(updatedUser);
+
+    setIsSubmitting(false);
+    onSubmitted(newProfile);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-2xl max-h-[92vh] overflow-hidden flex flex-col relative">
+        {/* Header */}
+        <div className="bg-gradient-to-r from-slate-900 via-blue-900 to-indigo-950 text-white p-5 sm:p-6 shrink-0 relative">
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 text-white/70 hover:text-white p-2 rounded-full hover:bg-white/10 transition-colors"
+          >
+            <X size={20} />
+          </button>
+          <div className="flex items-center gap-2.5 mb-1.5">
+            <span className="p-2 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-400/30">
+              <Store size={20} />
+            </span>
+            <div>
+              <h2 className="text-xl font-bold font-display text-white">
+                Register Technician / Store Profile
+              </h2>
+              <p className="text-xs text-blue-200">
+                दुकान या सर्विस प्रोवाइडर रजिस्ट्रेशन (Admin Approval Required)
+              </p>
+            </div>
+          </div>
+
+          {/* Stepper Indicator */}
+          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-white/10 text-xs">
+            <div
+              className={`flex items-center gap-1.5 pb-1 border-b-2 font-medium transition-all ${
+                currentStep >= 1 ? 'border-blue-400 text-white' : 'border-white/20 text-white/40'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                1
+              </span>
+              <span>Shop & Details</span>
+            </div>
+
+            <div
+              className={`flex items-center gap-1.5 pb-1 border-b-2 font-medium transition-all ${
+                currentStep >= 2 ? 'border-blue-400 text-white' : 'border-white/20 text-white/40'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                2
+              </span>
+              <span>Select Trades ({selectedCategoryIds.length})</span>
+            </div>
+
+            <div
+              className={`flex items-center gap-1.5 pb-1 border-b-2 font-medium transition-all ${
+                currentStep >= 3 ? 'border-blue-400 text-white' : 'border-white/20 text-white/40'
+              }`}
+            >
+              <span className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center text-[10px] font-bold">
+                3
+              </span>
+              <span>Aadhaar & Verification</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Scrollable Form Body */}
+        <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-5">
+          {errorMessage && (
+            <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-2xl text-xs font-medium flex items-center gap-2">
+              <Info size={14} className="shrink-0" />
+              <span>{errorMessage}</span>
+            </div>
+          )}
+
+          {/* STEP 1: SHOP & CONTACT INFORMATION */}
+          {currentStep === 1 && (
+            <form id="step-1-form" onSubmit={handleNext} className="space-y-4">
+              {/* Mandatory Google Sign-In (Gmail Authentication) for Technicians */}
+              {isGoogleVerified && googleEmail ? (
+                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between shadow-2xs">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-white border border-emerald-300 flex items-center justify-center text-emerald-600 shadow-2xs shrink-0">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                        <span>Google Account Verified</span>
+                        <CheckCircle2 size={13} className="text-emerald-600" />
+                      </p>
+                      <p className="text-[11px] text-emerald-800 font-mono font-medium truncate max-w-[200px] sm:max-w-xs">
+                        {googleEmail}
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
+                    Gmail OAuth
+                  </span>
+                </div>
+              ) : (
+                <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-3">
+                  <div className="flex items-start gap-2.5">
+                    <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
+                      <ShieldCheck size={18} />
+                    </div>
+                    <div>
+                      <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                        Google Sign-In (Gmail Authentication Required) *
+                      </h4>
+                      <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
+                        To protect customers and approve technician profiles, service providers must authenticate their Gmail account.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignInForTechnician}
+                      disabled={isGoogleAuthLoading}
+                      className="flex-1 py-2.5 px-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+                      </svg>
+                      <span>{isGoogleAuthLoading ? 'Authenticating...' : 'Sign in with Google'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleInstantDemoGoogleVerify}
+                      className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
+                      title="Instant test verification with needfix349@gmail.com"
+                    >
+                      <Sparkles size={13} />
+                      <span>Verify with needfix349@gmail.com</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-blue-50 border border-blue-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-blue-900 text-xs">
+                <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                <p>
+                  Enter your Store / Business Name, Calling & WhatsApp contact, and Location.
+                  Customers will reach out to you directly via Call & WhatsApp.
+                </p>
+              </div>
+
+              {/* Shop / Company Name */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Store / Company / Business Name <span className="text-red-500">*</span>
+                </label>
+                <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
+                  <Store size={18} className="text-slate-400 mr-2.5 shrink-0" />
+                  <input
+                    type="text"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                    placeholder="e.g. Verma Electricals & AC Care, Sharma Sanitary Store"
+                    className="w-full bg-transparent outline-none text-sm text-slate-900 font-bold"
+                    required
+                  />
+                </div>
+              </div>
+
+              {/* Mobile & WhatsApp */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                    Calling Mobile Number <span className="text-red-500">*</span>
+                  </label>
+                  <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
+                    <Phone size={18} className="text-slate-400 mr-2.5 shrink-0" />
+                    <input
+                      type="tel"
+                      value={mobile}
+                      onChange={(e) => {
+                        setMobile(e.target.value);
+                        if (sameAsMobile) setWhatsappNumber(e.target.value);
+                      }}
+                      placeholder="10-digit mobile"
+                      className="w-full bg-transparent outline-none text-sm text-slate-900 font-medium font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                      WhatsApp Number <span className="text-red-500">*</span>
+                    </label>
+                    <label className="flex items-center gap-1 text-[11px] text-blue-600 font-medium cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={sameAsMobile}
+                        onChange={(e) => {
+                          setSameAsMobile(e.target.checked);
+                          if (e.target.checked) setWhatsappNumber(mobile);
+                        }}
+                        className="rounded text-blue-600 focus:ring-0"
+                      />
+                      <span>Same as Mobile</span>
+                    </label>
+                  </div>
+                  <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
+                    <span className="text-emerald-600 font-bold text-xs mr-2 shrink-0">WA</span>
+                    <input
+                      type="tel"
+                      value={whatsappNumber}
+                      onChange={(e) => {
+                        setWhatsappNumber(e.target.value);
+                        setSameAsMobile(false);
+                      }}
+                      placeholder="WhatsApp enabled number"
+                      className="w-full bg-transparent outline-none text-sm text-slate-900 font-medium font-mono"
+                      required
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Workshop Location: Native GPS Fetch & Text Status Badge */}
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Workshop / Store Location <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500">
+                    Fetch your exact workshop GPS coordinates for accurate doorstep customer matching
+                  </span>
+                </div>
+
+                {gpsLockError && (
+                  <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-2">
+                    <AlertCircle size={14} className="shrink-0" />
+                    <span>{gpsLockError}</span>
+                  </div>
+                )}
+
+                {/* Single "Fetch Current Location" Button & Status Badge */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleFetchCurrentLocation}
+                    disabled={isLocatingGPS}
+                    className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 active:scale-98 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                    title="Fetch current device GPS coordinates"
+                  >
+                    {isLocatingGPS ? (
+                      <RefreshCw size={14} className="animate-spin text-white" />
+                    ) : (
+                      <Navigation size={14} className="fill-white text-white" />
+                    )}
+                    <span>{isLocatingGPS ? 'Fetching Location...' : 'Fetch Current Location'}</span>
+                  </button>
+
+                  {/* Text Status Badge displaying coordinates */}
+                  <div className="flex-1 flex items-center">
+                    {workshopLocation ? (
+                      <div className="w-full flex flex-wrap items-center gap-2 bg-emerald-50 border border-emerald-200 px-3 py-2 rounded-xl">
+                        <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5 font-mono">
+                          <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                          GPS Locked: Lat {workshopLocation.latitude.toFixed(5)}, Lng {workshopLocation.longitude.toFixed(5)}
+                        </span>
+                        <span className="text-[11px] text-emerald-700 font-medium">
+                          ({workshopLocation.city || 'Workshop'}{workshopLocation.state ? `, ${workshopLocation.state}` : ''})
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-full flex items-center gap-1.5 bg-slate-100 border border-slate-200 px-3 py-2 rounded-xl text-xs text-slate-500">
+                        <Navigation size={13} className="text-slate-400 shrink-0" />
+                        <span>GPS not fetched yet. Click "Fetch Current Location".</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {workshopLocation && (
+                  <div className="text-[11px] text-slate-500 flex items-center gap-1.5 px-1 font-mono">
+                    <MapPin size={12} className="text-slate-400 shrink-0" />
+                    <span className="truncate">
+                      {workshopLocation.address || `${workshopLocation.area || 'Workshop Area'}, ${workshopLocation.city}`}
+                    </span>
+                  </div>
+                )}
+              </div>
+
+                {/* Service Coverage Radius Slider - 1km to 20km Custom Range */}
+                <div className="pt-1 bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <span>🎯 Service Coverage Radius</span>
+                      <span className="text-[10px] text-slate-500 font-normal">(1 km - 20 km)</span>
+                    </label>
+                    <span className="font-extrabold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200 text-xs">
+                      {coverageRadiusKm} km
+                    </span>
+                  </div>
+
+                  {/* Smooth Range Slider (1 to 20 km, step 1) */}
+                  <input
+                    type="range"
+                    min={1}
+                    max={20}
+                    step={1}
+                    value={coverageRadiusKm}
+                    onChange={(e) => setCoverageRadiusKm(Number(e.target.value))}
+                    className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
+                  />
+
+                  {/* Quick Preset Buttons */}
+                  <div className="flex items-center justify-between gap-1.5">
+                    {[1, 3, 5, 10, 15, 20].map((step) => (
+                      <button
+                        key={step}
+                        type="button"
+                        onClick={() => setCoverageRadiusKm(step)}
+                        className={`flex-1 py-1 px-1.5 rounded-lg text-xs font-bold transition-all border ${
+                          coverageRadiusKm === step
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        {step} km
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
+                    <span>1 km (Neighborhood)</span>
+                    <span>10 km (Standard)</span>
+                    <span>20 km (Max Radius)</span>
+                  </div>
+                </div>
+            </form>
+          )}
+
+          {/* STEP 2: MULTI-TRADE / SKILLS SELECTION */}
+          {currentStep === 2 && (
+            <form id="step-2-form" onSubmit={handleNext} className="space-y-4">
+              <div className="bg-amber-50 border border-amber-300/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-amber-950 text-xs">
+                <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="font-bold">Select All Services You Provide (एकाधिक काम चुनें)</p>
+                  <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
+                    You can select 1, 2, 3, or more categories (e.g. Electrician + AC Repair + Plumber).
+                    Your shop will show up in customer searches for all selected trades!
+                  </p>
+                </div>
+              </div>
+
+              {/* Category Multi-Select Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-[380px] overflow-y-auto pr-1">
+                {SERVICE_CATEGORIES.map((cat) => {
+                  const isSelected = selectedCategoryIds.includes(cat.id);
+                  return (
+                    <div
+                      key={cat.id}
+                      onClick={() => toggleCategory(cat.id)}
+                      className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                        isSelected
+                          ? 'border-blue-600 bg-blue-50/70 shadow-sm'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <CategoryLogo categoryId={cat.id} size="sm" className="w-8 h-8 rounded-xl shrink-0 shadow-xs" />
+                        <div className="min-w-0">
+                          <p className="font-bold text-xs text-slate-900 truncate">
+                            {cat.name}
+                          </p>
+                          <p className="text-[10px] text-slate-500 truncate">
+                            {cat.hindiName || cat.description}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div
+                        className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-blue-600 text-white font-bold'
+                            : 'border-2 border-slate-300 text-transparent'
+                        }`}
+                      >
+                        <Check size={14} />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center justify-between text-xs">
+                <span className="text-slate-600 font-medium">Selected Trades:</span>
+                <span className="font-bold text-blue-700 bg-blue-100 px-2.5 py-0.5 rounded-full">
+                  {selectedCategoryIds.length} Categories Selected
+                </span>
+              </div>
+            </form>
+          )}
+
+          {/* STEP 3: AADHAAR ID & SHOP PHOTO */}
+          {currentStep === 3 && (
+            <form id="step-3-form" onSubmit={handleFinalSubmit} className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-300/80 rounded-2xl p-4 flex items-start gap-3 text-emerald-950">
+                <ShieldCheck size={24} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-900">
+                    Photo Upload & Document Verification (Admin Desk: 8092805945)
+                  </h4>
+                  <p className="text-xs text-emerald-800 mt-0.5 leading-relaxed">
+                    Provide your 12-digit Aadhaar number and upload your store logo and Aadhaar card photo/document directly from your gallery or camera for official administrator approval.
+                  </p>
+                </div>
+              </div>
+
+              {/* Hidden File Inputs for Gallery/Camera Access */}
+              <input
+                ref={logoFileInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleLogoFileChange}
+              />
+              <input
+                ref={aadhaarFrontFileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={handleAadhaarFrontFileChange}
+              />
+              <input
+                ref={aadhaarBackFileInputRef}
+                type="file"
+                accept="image/*,.pdf"
+                className="hidden"
+                onChange={handleAadhaarBackFileChange}
+              />
+
+              {/* 1. Shop Logo / Photo */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
+                    Store / Shop Photo or Logo <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-blue-700 font-semibold">Upload from Gallery or Camera</span>
+                </div>
+                <div className="p-3.5 bg-slate-50 border border-slate-300 rounded-2xl">
+                  <div className="flex flex-col sm:flex-row items-center gap-3.5">
+                    {/* Logo Preview: Clean SVG camera/store placeholder icon when no image is uploaded */}
+                    <div className="relative group shrink-0">
+                      {companyLogoUrl && !logoLoadError ? (
+                        <div className="relative">
+                          <img
+                            src={companyLogoUrl}
+                            alt="Store logo preview"
+                            onError={() => setLogoLoadError(true)}
+                            className="w-20 h-20 rounded-2xl object-cover border-2 border-blue-600 shadow-sm bg-white shrink-0"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompanyLogoUrl('');
+                              setLogoFileName('');
+                              setLogoLoadError(false);
+                            }}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-red-600 hover:bg-red-700 text-white flex items-center justify-center shadow-xs cursor-pointer transition-colors"
+                            title="Remove photo"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => logoFileInputRef.current?.click()}
+                          className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white hover:bg-blue-50/40 flex flex-col items-center justify-center text-slate-400 shrink-0 cursor-pointer transition-all group"
+                          title="Click to select store logo"
+                        >
+                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+                            <Store size={20} />
+                          </div>
+                          <span className="text-[9px] font-bold text-slate-500 group-hover:text-blue-600 mt-1 uppercase tracking-tight transition-colors">
+                            No Logo
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Logo Actions */}
+                    <div className="flex-1 w-full space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => logoFileInputRef.current?.click()}
+                          className="py-2 px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <FolderOpen size={14} />
+                          <span>Choose from Gallery</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => logoFileInputRef.current?.click()}
+                          className="py-2 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
+                        >
+                          <Camera size={14} className="text-slate-500" />
+                          <span>Camera</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between text-[11px] text-slate-500">
+                        <span className="truncate max-w-[200px]">
+                          {logoFileName ? `📁 ${logoFileName}` : 'JPG, PNG, WebP (Max 8MB)'}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCompanyLogoUrl(
+                                'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=300&auto=format&fit=crop&q=80'
+                              );
+                              setLogoFileName('sample-shop-photo.jpg');
+                              setLogoLoadError(false);
+                              setErrorMessage(null);
+                            }}
+                            className="text-blue-600 hover:underline text-[10px] font-medium cursor-pointer"
+                          >
+                            Sample Photo
+                          </button>
+                          <span>•</span>
+                          <button
+                            type="button"
+                            onClick={() => setShowLogoUrlInput(!showLogoUrlInput)}
+                            className="text-slate-600 hover:underline text-[10px] cursor-pointer"
+                          >
+                            {showLogoUrlInput ? 'Hide URL' : 'Enter URL'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {showLogoUrlInput && (
+                        <input
+                          type="url"
+                          value={companyLogoUrl}
+                          onChange={(e) => {
+                            setCompanyLogoUrl(e.target.value);
+                            setLogoFileName('Custom URL');
+                            setLogoLoadError(false);
+                          }}
+                          placeholder="https://..."
+                          className="w-full p-2 bg-white border border-slate-300 rounded-xl text-xs font-medium text-slate-800 outline-none focus:border-blue-600"
+                        />
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. 12-Digit Aadhaar Number (Mandatory) */}
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <span>12-Digit Aadhaar Number</span>
+                    <span className="text-red-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-500 font-medium">UIDAI Identity Verification</span>
+                </div>
+                <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
+                  <ShieldCheck size={18} className="text-slate-400 mr-2.5 shrink-0" />
+                  <input
+                    type="text"
+                    maxLength={14}
+                    value={aadhaarNumber}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/\D/g, '').slice(0, 12);
+                      const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ');
+                      setAadhaarNumber(formatted);
+                    }}
+                    placeholder="e.g. 5432 8901 2345"
+                    className="w-full bg-transparent outline-none text-sm text-slate-900 font-mono font-bold tracking-wider placeholder:tracking-normal placeholder:font-normal"
+                    required
+                  />
+                  {aadhaarNumber.replace(/\D/g, '').length === 12 && (
+                    <CheckCircle2 size={18} className="text-emerald-600 shrink-0 ml-2" />
+                  )}
+                </div>
+                <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
+                  <span>Enter the 12 digits from your official Aadhaar card</span>
+                  <button
+                    type="button"
+                    onClick={() => setAadhaarNumber('5432 8901 2345')}
+                    className="text-blue-600 hover:underline font-medium cursor-pointer"
+                  >
+                    Demo: 5432 8901 2345
+                  </button>
+                </div>
+              </div>
+
+              {/* 3. Streamlined Aadhaar KYC Action Card (Dual-Side Front & Back) */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-1 flex-wrap gap-1">
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <span>Aadhaar Identity Verification (Dual-Side)</span>
+                    <span className="bg-red-100 text-red-700 text-[10px] px-2 py-0.5 rounded-full font-extrabold uppercase">
+                      Mandatory *
+                    </span>
+                  </label>
+                  <span className="text-[11px] text-emerald-700 font-semibold">
+                    1.6:1 UIDAI Ratio • Compressed &lt;300 KB
+                  </span>
+                </div>
+
+                {/* SINGLE STREAMLINED KYC ACTION CARD */}
+                <div className="p-4 sm:p-5 bg-gradient-to-br from-slate-900 via-blue-950 to-slate-900 text-white rounded-2xl shadow-md border border-blue-800/40 space-y-4">
+                  {/* Card Header & Description */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-400/30 flex items-center justify-center shrink-0">
+                        <ShieldCheck size={22} />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                          <span>National ID KYC Verification</span>
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 rounded-full text-[10px] font-bold border border-emerald-500/30">
+                            Required for Activation
+                          </span>
+                        </h4>
+                        <p className="text-xs text-blue-200/80 leading-tight mt-0.5">
+                          Capture or upload both sides of your official Aadhaar card for quick administrator verification.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* VISUAL STATUS BADGES & DUAL-SIDE PREVIEWS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-1">
+                    {/* FRONT SIDE */}
+                    <div
+                      className={`p-3 rounded-xl border transition-all ${
+                        isFrontCaptured
+                          ? 'bg-emerald-950/40 border-emerald-500/60'
+                          : 'bg-slate-800/60 border-slate-700/80'
+                      }`}
+                    >
+                      {/* Explicit Status Indicator Badge */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-200">Front Side (Photo & Name)</span>
+                        {isFrontCaptured ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <CheckCircle2 size={12} className="text-emerald-400" />
+                            <span>Front: Captured</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            <AlertCircle size={12} className="text-amber-400" />
+                            <span>Front: Pending</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Preview or Placeholder Box */}
+                      {isFrontCaptured ? (
+                        <div className="relative group">
+                          <img
+                            src={aadhaarDocUrl}
+                            alt="Front Aadhaar Card"
+                            className="w-full aspect-[1.6/1] object-cover rounded-lg border border-emerald-400/40 shadow-xs bg-black/40"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => aadhaarFrontFileInputRef.current?.click()}
+                            className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white rounded text-[10px] font-medium backdrop-blur-sm transition-colors cursor-pointer"
+                          >
+                            Replace
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => aadhaarFrontFileInputRef.current?.click()}
+                          className="w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-slate-600 hover:border-blue-400 bg-slate-850/50 hover:bg-slate-800 flex flex-col items-center justify-center text-slate-400 cursor-pointer transition-colors p-2 text-center"
+                        >
+                          <FileCheck size={22} className="text-slate-500 mb-1" />
+                          <span className="text-[11px] font-semibold text-slate-300">Front of Aadhaar</span>
+                          <span className="text-[9px] text-slate-500">Must show clear face & UID</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* BACK SIDE */}
+                    <div
+                      className={`p-3 rounded-xl border transition-all ${
+                        isBackCaptured
+                          ? 'bg-emerald-950/40 border-emerald-500/60'
+                          : 'bg-slate-800/60 border-slate-700/80'
+                      }`}
+                    >
+                      {/* Explicit Status Indicator Badge */}
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-xs font-bold text-slate-200">Back Side (Address & QR)</span>
+                        {isBackCaptured ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            <CheckCircle2 size={12} className="text-emerald-400" />
+                            <span>Back: Captured</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                            <AlertCircle size={12} className="text-amber-400" />
+                            <span>Back: Pending</span>
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Preview or Placeholder Box */}
+                      {isBackCaptured ? (
+                        <div className="relative group">
+                          <img
+                            src={aadhaarBackDocUrl}
+                            alt="Back Aadhaar Card"
+                            className="w-full aspect-[1.6/1] object-cover rounded-lg border border-emerald-400/40 shadow-xs bg-black/40"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => aadhaarBackFileInputRef.current?.click()}
+                            className="absolute bottom-2 right-2 px-2 py-1 bg-black/70 hover:bg-black text-white rounded text-[10px] font-medium backdrop-blur-sm transition-colors cursor-pointer"
+                          >
+                            Replace
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => aadhaarBackFileInputRef.current?.click()}
+                          className="w-full aspect-[1.6/1] rounded-lg border-2 border-dashed border-slate-600 hover:border-blue-400 bg-slate-850/50 hover:bg-slate-800 flex flex-col items-center justify-center text-slate-400 cursor-pointer transition-colors p-2 text-center"
+                        >
+                          <FileCheck size={22} className="text-slate-500 mb-1" />
+                          <span className="text-[11px] font-semibold text-slate-300">Back of Aadhaar</span>
+                          <span className="text-[9px] text-slate-500">Must show address & QR code</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* STREAMLINED ACTION BUTTONS: One Primary + One Secondary */}
+                  <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto">
+                      {/* Primary Button */}
+                      <button
+                        type="button"
+                        onClick={() => setIsGuidedKYCOpen(true)}
+                        className="w-full sm:w-auto py-2.5 px-4.5 bg-emerald-500 hover:bg-emerald-400 active:scale-98 text-slate-950 rounded-xl text-xs font-black shadow-md shadow-emerald-500/20 transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                      >
+                        <Camera size={16} className="text-slate-950" />
+                        <span>Launch Guided Camera (Front & Back)</span>
+                      </button>
+
+                      {/* Secondary Button */}
+                      <button
+                        type="button"
+                        onClick={handleGalleryUploadClick}
+                        className="w-full sm:w-auto py-2.5 px-4 bg-slate-800 hover:bg-slate-700 active:scale-98 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+                      >
+                        <FolderOpen size={15} className="text-blue-400" />
+                        <span>Upload from Gallery</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Demo & Reset Helpers */}
+                    <div className="flex items-center gap-3 text-[11px] text-slate-400 w-full sm:w-auto justify-between sm:justify-end">
+                      <button
+                        type="button"
+                        onClick={handleUseSampleAadhaar}
+                        className="text-blue-300 hover:text-blue-200 hover:underline font-medium cursor-pointer"
+                      >
+                        Use Demo Aadhaar
+                      </button>
+                      {(isFrontCaptured || isBackCaptured) && (
+                        <button
+                          type="button"
+                          onClick={handleClearAadhaar}
+                          className="text-red-400 hover:text-red-300 hover:underline font-medium cursor-pointer"
+                        >
+                          Clear Photos
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agreement */}
+              <div className="pt-2">
+                <label className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 border border-slate-200 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasAgreedTerms}
+                    onChange={(e) => setHasAgreedTerms(e.target.checked)}
+                    className="mt-0.5 rounded text-blue-600 focus:ring-0"
+                  />
+                  <span className="text-xs text-slate-700 leading-relaxed">
+                    I confirm that the store details, contact numbers, and uploaded Aadhaar document are authentic.
+                    I authorize NeedFix administrators to review my credentials before public directory activation.
+                  </span>
+                </label>
+              </div>
+            </form>
+          )}
+        </div>
+
+        {/* Footer Navigation Buttons */}
+        <div className="p-4 sm:p-5 border-t border-slate-200 bg-slate-50/80 shrink-0 flex items-center justify-between gap-3">
+          {currentStep > 1 ? (
+            <button
+              type="button"
+              onClick={() => {
+                setErrorMessage(null);
+                setCurrentStep((prev) => (prev - 1) as any);
+              }}
+              className="py-2.5 px-4 bg-white hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold border border-slate-300 transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <ArrowLeft size={14} />
+              <span>Previous</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onClose}
+              className="py-2.5 px-4 bg-white hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-medium border border-slate-200 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          )}
+
+          {currentStep < 3 ? (
+            <button
+              type="submit"
+              form={`step-${currentStep}-form`}
+              className="py-2.5 px-6 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20 flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>Continue</span>
+              <ArrowRight size={14} />
+            </button>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2.5">
+              {!isAadhaarComplete && (
+                <span className="text-[11px] text-amber-700 font-semibold flex items-center gap-1 bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-lg">
+                  <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                  <span>Front & Back Aadhaar cards required to submit</span>
+                </span>
+              )}
+              <button
+                type="submit"
+                form="step-3-form"
+                disabled={isSubmitting || !hasAgreedTerms || !isAadhaarComplete}
+                className="py-3 px-6 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white rounded-xl text-xs font-bold transition-all shadow-lg shadow-emerald-600/30 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              >
+                <ShieldCheck size={16} />
+                <span>Submit for Admin Approval</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* GUIDED DUAL-SIDE CAMERA KYC MODAL */}
+      <GuidedAadhaarKYCModal
+        isOpen={isGuidedKYCOpen}
+        onClose={() => setIsGuidedKYCOpen(false)}
+        currentUser={currentUser}
+        initialAadhaarNumber={aadhaarNumber}
+        onKYCComplete={(data) => {
+          setAadhaarNumber(data.aadhaarNumber);
+          setAadhaarDocUrl(data.frontUrl);
+          setAadhaarBackDocUrl(data.backUrl);
+          setAadhaarFileName('Aadhaar-Dual-Side-Camera-KYC.jpg');
+          setIsGuidedKYCComplete(true);
+          setIsGuidedKYCOpen(false);
+          setErrorMessage(null);
+        }}
+      />
+    </div>
+  );
+};
