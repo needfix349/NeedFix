@@ -65,9 +65,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Zoomed Aadhaar image preview modal
   const [zoomedAadhaarUrl, setZoomedAadhaarUrl] = useState<string | null>(null);
 
-  // Admin Login state (Supabase Email & Password)
-  const [adminEmail, setAdminEmail] = useState('needfix349@gmail.com');
-  const [adminPassword, setAdminPassword] = useState('Nadeem@1266');
+  // Admin Login state (Supabase Email & Password) - Secure empty defaults
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
@@ -95,6 +95,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const loadData = () => {
     setTechnicians(storageService.getTechnicians());
     setAuditLogs(storageService.getAuditLogs());
+
+    supabaseService.getAllTechniciansForAdmin().then((allTechs) => {
+      if (allTechs) {
+        setTechnicians(allTechs);
+      }
+    }).catch(console.warn);
   };
 
   useEffect(() => {
@@ -140,9 +146,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleAdminLogout = async () => {
     await supabaseService.signOut();
-    const customerUser = storageService.loginAsDemoRole('customer');
-    setCurrentUser(customerUser);
-    if (onUserChange) onUserChange(customerUser);
+    setCurrentUser(null);
+    if (onUserChange) onUserChange(null);
     if (onExitAdmin) onExitAdmin();
   };
 
@@ -342,7 +347,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="needfix349@gmail.com"
+                placeholder="Enter admin email"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
             </div>
@@ -365,40 +370,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="••••••••"
+                placeholder="Enter admin password"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
-            </div>
-
-            {/* Quick Fill Primary Master Admin Credentials Button */}
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5">
-                  <Key size={13} className="text-amber-500" />
-                  Primary Master Admin Credentials
-                </span>
-                <span className="text-[10px] font-mono bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full font-bold">
-                  Up to 10 Concurrent Logins
-                </span>
-              </div>
-              <div className="text-[11px] font-mono text-slate-600 space-y-0.5">
-                <div>
-                  Email: <span className="font-bold text-slate-900">needfix349@gmail.com</span>
-                </div>
-                <div>
-                  Password: <span className="font-bold text-slate-900">Nadeem@1266</span>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setAdminEmail('needfix349@gmail.com');
-                  setAdminPassword('Nadeem@1266');
-                }}
-                className="w-full py-1.5 text-xs font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors text-center border border-blue-200"
-              >
-                Auto-Fill Master Credentials
-              </button>
             </div>
 
             <div className="pt-2 space-y-2">
@@ -482,7 +456,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               />
               <div>
                 <div className="flex items-center gap-1.5">
-                  <span className="text-xs font-bold text-white">{currentUser?.name || 'Nadeem'}</span>
+                  <span className="text-xs font-bold text-white">{currentUser?.name || 'Administrator'}</span>
                   <span className="bg-purple-500/30 text-purple-300 text-[10px] font-bold px-1.5 py-0.2 rounded-md">
                     Admin
                   </span>
@@ -657,7 +631,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none"
             >
-              <option value="all">All 20 Categories</option>
+              <option value="all">All 22 Categories</option>
               {SERVICE_CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.icon} {c.name}

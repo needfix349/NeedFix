@@ -71,10 +71,6 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
     : null;
 
   const handleCall = () => {
-    if (!currentUser) {
-      onRequireAuth('call this technician');
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'call',
@@ -84,10 +80,6 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleCallForService = (serviceName: string) => {
-    if (!currentUser) {
-      onRequireAuth('call this technician');
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'call',
@@ -97,10 +89,6 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsApp = () => {
-    if (!currentUser) {
-      onRequireAuth('chat on WhatsApp with this technician');
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
@@ -114,10 +102,6 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsAppForService = (serviceName: string) => {
-    if (!currentUser) {
-      onRequireAuth('chat on WhatsApp with this technician');
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
@@ -240,8 +224,8 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
                     >
                       <CategoryLogo
                         categoryId={catId}
-                        size="sm"
-                        className="w-4 h-4 rounded-md shrink-0"
+                        size="xs"
+                        className="w-4 h-4 shrink-0"
                       />
                       <span>{catObj?.name || technician.categoryName}</span>
                     </span>
@@ -270,33 +254,6 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
 
         {/* Scrollable Body Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800">
-          {/* Mobile Login Required Banner when not logged in */}
-          {!currentUser && (
-            <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-950 shadow-xs">
-              <div className="flex items-start gap-3">
-                <div className="w-9 h-9 rounded-xl bg-amber-200/70 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
-                  <Lock size={18} />
-                </div>
-                <div>
-                  <h4 className="text-xs font-bold text-slate-900">
-                    Mobile Login Required to Contact Technician
-                  </h4>
-                  <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                    टेक्नीशियन से Call, WhatsApp या Message करने के लिए पहले अपने फोन नंबर से लॉगिन करें।
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => onRequireAuth('contact this technician')}
-                className="w-full sm:w-auto py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-              >
-                <Phone size={13} />
-                <span>Login with Phone Number</span>
-              </button>
-            </div>
-          )}
-
           {/* Verification Badge & Guarantee Seal */}
           {technician.isVerified && (
             <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
@@ -424,21 +381,19 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
                           type="button"
                           onClick={() => handleCallForService(srv.name)}
                           className="py-2 px-3 sm:px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
-                          title={currentUser ? `Call technician for ${srv.name}` : "Login required to call"}
+                          title={`Call technician for ${srv.name}`}
                         >
                           <Phone size={13} className="shrink-0" />
                           <span>Call</span>
-                          {!currentUser && <Lock size={10} className="text-blue-200" />}
                         </button>
                         <button
                           type="button"
                           onClick={() => handleWhatsAppForService(srv.name)}
                           className="py-2 px-3 sm:px-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer whitespace-nowrap"
-                          title={currentUser ? `WhatsApp technician for ${srv.name}` : "Login required to WhatsApp"}
+                          title={`WhatsApp technician for ${srv.name}`}
                         >
                           <MessageSquare size={13} className="shrink-0" />
                           <span>WhatsApp</span>
-                          {!currentUser && <Lock size={10} className="text-emerald-200" />}
                         </button>
                       </div>
                     </div>
@@ -609,15 +564,10 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
             type="button"
             onClick={handleCall}
             className="py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/25 cursor-pointer"
-            title={currentUser ? "Call Technician Directly" : "Login with phone number required to call"}
+            title="Call Technician Directly"
           >
             <Phone size={17} />
             <span>Direct Call</span>
-            {!currentUser && (
-              <span className="text-[10px] bg-blue-800/60 text-blue-100 px-1.5 py-0.5 rounded font-semibold flex items-center gap-0.5">
-                <Lock size={10} /> Login
-              </span>
-            )}
           </button>
 
           {/* Direct WhatsApp Action Button */}
@@ -625,15 +575,10 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
             type="button"
             onClick={handleWhatsApp}
             className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 cursor-pointer"
-            title={currentUser ? "Direct WhatsApp Chat" : "Login with phone number required to WhatsApp"}
+            title="Direct WhatsApp Chat"
           >
             <MessageSquare size={17} />
             <span>WhatsApp Chat</span>
-            {!currentUser && (
-              <span className="text-[10px] bg-emerald-800/50 text-emerald-100 px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                <Lock size={10} /> Login
-              </span>
-            )}
           </button>
         </div>
       </div>

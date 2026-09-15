@@ -80,7 +80,7 @@ export const HelpSupportModal: React.FC<HelpSupportModalProps> = ({
               <span>One-Touch Direct Email Support</span>
             </div>
             <p className="text-[11px] text-slate-600 leading-relaxed">
-              Click the button below to immediately open your native <strong>Email or Gmail app</strong> with our official support address pre-filled:
+              Click the button below to immediately open your native <strong>email client</strong> with our official support address pre-filled:
             </p>
 
             <a

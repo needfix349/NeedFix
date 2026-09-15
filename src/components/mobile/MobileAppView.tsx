@@ -18,6 +18,7 @@ import {
   Clock,
   CheckCircle2,
   Navigation,
+  LayoutGrid,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, UserProfile, ServiceLead } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -197,11 +198,11 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                 </div>
               </div>
 
-              {/* 20 Categories Grid (Mobile Optimized) */}
+              {/* 22 Categories Grid (Mobile Optimized) */}
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    20 Trade Categories
+                    22 Trade Categories
                   </h3>
                   {selectedCategory !== 'all' && (
                     <button
@@ -230,7 +231,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                     </span>
                   </button>
 
-                  {/* 20 Specific Categories */}
+                  {/* 22 Specific Categories */}
                   {SERVICE_CATEGORIES.map((cat) => {
                     const isSelected = selectedCategory === cat.id;
                     return (
@@ -348,8 +349,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                                   >
                                     <CategoryLogo
                                       categoryId={cId}
-                                      size="sm"
-                                      className="w-3 h-3 rounded shrink-0"
+                                      size="xs"
+                                      className="w-3.5 h-3.5 shrink-0"
                                     />
                                     <span className="truncate max-w-[120px]">
                                       {cObj?.name || tech.categoryName}

@@ -9,7 +9,6 @@ import { TechnicianRegistrationModal } from './components/technician/TechnicianR
 import { TechnicianDetailModal } from './components/customer/TechnicianDetailModal';
 import { ImportantNoticeModal } from './components/auth/ImportantNoticeModal';
 import { SMSNotificationToast } from './components/common/SMSNotificationToast';
-import { BypassTestingBar } from './components/common/BypassTestingBar';
 import { NeedFixAppIcon } from './components/common/NeedFixAppIcon';
 import { Footer } from './components/layout/Footer';
 import { HelpSupportModal } from './components/common/HelpSupportModal';
@@ -48,18 +47,20 @@ export default function App() {
   const [authPromptMessage, setAuthPromptMessage] = useState<string | undefined>(undefined);
   const [authInitialRole, setAuthInitialRole] = useState<'customer' | 'technician'>('customer');
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [showImportantNoticeModal, setShowImportantNoticeModal] = useState(false);
+  const [showImportantNoticeModal, setShowImportantNoticeModal] = useState<boolean>(() => {
+    return !storageService.hasAgreedImportantNotice();
+  });
   const [showTechRegistrationModal, setShowTechRegistrationModal] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState<TechnicianProfile | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
 
   const handleRequireAuth = (actionDescription?: string, role: 'customer' | 'technician' = 'customer') => {
     if (role === 'technician') {
-      setAuthPromptMessage('Technician verification via Google Sign-In is required to register and manage service provider profiles.');
+      setAuthPromptMessage('Technician verification is required to register and manage service provider profiles.');
     } else if (actionDescription) {
-      setAuthPromptMessage(`To ${actionDescription}, please login with your mobile phone number.`);
+      setAuthPromptMessage(`To ${actionDescription}, please enter your details.`);
     } else {
-      setAuthPromptMessage('Please login with your mobile phone number to contact technicians.');
+      setAuthPromptMessage('Please enter your details to contact technicians.');
     }
     setAuthInitialRole(role);
     setShowAuthModal(true);
@@ -100,8 +101,20 @@ export default function App() {
   };
 
   useEffect(() => {
+    // Check if visitor has accepted Important Notice
+    if (!storageService.hasAgreedImportantNotice()) {
+      setShowImportantNoticeModal(true);
+    }
+
     syncState();
     const unsubStorage = storageService.subscribe(syncState);
+
+    // Load live approved technicians from Supabase database
+    supabaseService.getApprovedTechnicians().then((liveTechs) => {
+      if (liveTechs && liveTechs.length > 0) {
+        setTechnicians(liveTechs);
+      }
+    }).catch(console.warn);
 
     const handleSupabaseUser = (sbUser: any) => {
       const fullName =
@@ -114,9 +127,9 @@ export default function App() {
         sbUser.user_metadata?.picture ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
 
-      const synced = storageService.syncGoogleUser({
+      const synced = storageService.syncExternalUser({
         uid: sbUser.id,
-        email: sbUser.email || 'needfix349@gmail.com',
+        email: sbUser.email,
         displayName: fullName,
         photoURL: avatar,
         role: 'customer',
@@ -170,17 +183,9 @@ export default function App() {
     setShowAuthModal(false);
     setCurrentUser(user);
 
-    // If user logged in with Google or has email, check if they agreed to the mandatory Important Notice
-    const isGoogleUser = Boolean(
-      user.email &&
-        (user.id.startsWith('google_') ||
-          user.id.startsWith('supa_') ||
-          user.email === 'needfix349@gmail.com' ||
-          !user.mobile)
-    );
     const hasAgreed = storageService.hasAgreedImportantNotice(user.id, user.email);
 
-    if (isGoogleUser && !hasAgreed) {
+    if (!hasAgreed) {
       setShowImportantNoticeModal(true);
     } else if (isNewUser || !user.name) {
       setShowOnboardingModal(true);
@@ -193,8 +198,8 @@ export default function App() {
 
   // Agree to Important Notice handler (Mandatory disclaimer)
   const handleAgreeImportantNotice = () => {
+    storageService.setAgreedImportantNotice(currentUser?.id, currentUser?.email);
     if (currentUser) {
-      storageService.setAgreedImportantNotice(currentUser.id, currentUser.email);
       const updatedUser: UserProfile = {
         ...currentUser,
         hasAgreedNotice: true,
@@ -205,7 +210,6 @@ export default function App() {
       supabaseService.upsertUserInDatabase(updatedUser).catch(console.warn);
     }
     setShowImportantNoticeModal(false);
-    setActiveView('home');
   };
 
   // Onboarding completion
@@ -248,30 +252,6 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
-      {/* Dev & Testing Bypass Bar */}
-      <BypassTestingBar
-        currentUser={currentUser}
-        onSwitchUser={(user) => {
-          setTechnicians(storageService.getTechnicians());
-          setCurrentUser(user);
-          if (user.role === 'admin') setActiveView('admin_panel');
-          else if (user.role === 'technician') setActiveView('technician_dashboard');
-          else setActiveView('home');
-        }}
-        onOpenLoginModal={() => {
-          setAuthPromptMessage(undefined);
-          setShowAuthModal(true);
-        }}
-        onTriggerSampleOTP={() => {
-          otpService.sendOTP('+91', '9876543210');
-        }}
-        onResetDatabase={() => {
-          storageService.resetToDefaults();
-          syncState();
-          setActiveView('home');
-        }}
-      />
-
       {/* Offline PWA Connectivity Indicator */}
       <OfflineIndicator />
 
@@ -409,7 +389,7 @@ export default function App() {
         userRole={currentUser?.role}
       />
 
-      {/* 6. Mandatory Important Notice / Disclaimer Modal after Google Login */}
+      {/* 6. Mandatory Important Notice / Disclaimer Modal */}
       <ImportantNoticeModal
         isOpen={showImportantNoticeModal}
         onAgree={handleAgreeImportantNotice}

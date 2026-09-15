@@ -17,17 +17,17 @@ import {
   ADMIN_PHONE_NUMBER,
 } from '../data/mockData';
 
-const STORAGE_VERSION = 'v8';
+const STORAGE_VERSION = 'v9_production';
 const KEYS = {
-  VERSION: 'needfix_storage_ver_v8',
-  CURRENT_USER: 'needfix_v8_current_user',
-  USERS: 'needfix_v8_users',
-  TECHNICIANS: 'needfix_v8_technicians',
-  LEADS: 'needfix_v8_leads',
-  REVIEWS: 'needfix_v8_reviews',
-  AUDIT_LOGS: 'needfix_v8_audit_logs',
-  ACTIVITY_LOGS: 'needfix_v8_activity_logs',
-  FAVORITES: 'needfix_v8_favorites',
+  VERSION: 'needfix_storage_ver_v9',
+  CURRENT_USER: 'needfix_v9_current_user',
+  USERS: 'needfix_v9_users',
+  TECHNICIANS: 'needfix_v9_technicians',
+  LEADS: 'needfix_v9_leads',
+  REVIEWS: 'needfix_v9_reviews',
+  AUDIT_LOGS: 'needfix_v9_audit_logs',
+  ACTIVITY_LOGS: 'needfix_v9_activity_logs',
+  FAVORITES: 'needfix_v9_favorites',
 };
 
 class StorageService {
@@ -41,42 +41,38 @@ class StorageService {
     const currentVer = localStorage.getItem(KEYS.VERSION);
     if (currentVer !== STORAGE_VERSION) {
       localStorage.setItem(KEYS.VERSION, STORAGE_VERSION);
-      localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
-      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(INITIAL_TECHNICIANS));
-      localStorage.setItem(KEYS.LEADS, JSON.stringify(INITIAL_LEADS));
-      localStorage.setItem(KEYS.REVIEWS, JSON.stringify(INITIAL_REVIEWS));
-      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+      localStorage.setItem(KEYS.USERS, JSON.stringify([]));
+      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
+      localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
+      localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
+      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
       localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
       localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
-      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(INITIAL_USERS[0]));
+      // Remove any legacy mock user session
+      localStorage.removeItem(KEYS.CURRENT_USER);
       return;
     }
 
     if (!localStorage.getItem(KEYS.USERS)) {
-      localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
+      localStorage.setItem(KEYS.USERS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.TECHNICIANS)) {
-      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(INITIAL_TECHNICIANS));
+      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.LEADS)) {
-      localStorage.setItem(KEYS.LEADS, JSON.stringify(INITIAL_LEADS));
+      localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.REVIEWS)) {
-      localStorage.setItem(KEYS.REVIEWS, JSON.stringify(INITIAL_REVIEWS));
+      localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.AUDIT_LOGS)) {
-      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.ACTIVITY_LOGS)) {
       localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
     }
     if (!localStorage.getItem(KEYS.FAVORITES)) {
       localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
-    }
-
-    // Default current user to first customer if not set
-    if (!localStorage.getItem(KEYS.CURRENT_USER)) {
-      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(INITIAL_USERS[0]));
     }
   }
 
@@ -91,21 +87,32 @@ class StorageService {
 
   // --- IMPORTANT NOTICE AGREEMENT ---
   hasAgreedImportantNotice(userId?: string, email?: string): boolean {
-    if (!userId && !email) return false;
-    if (userId && localStorage.getItem(`needfix_notice_agreed_${userId}`) === 'true') {
-      return true;
+    // 1. Check persistent visitor acceptance on this device/browser
+    const visitorAgreed = localStorage.getItem('needfix_notice_agreed_visitor') === 'true';
+    if (!visitorAgreed) {
+      return false;
     }
-    if (email && localStorage.getItem(`needfix_notice_agreed_${email.toLowerCase()}`) === 'true') {
-      return true;
+
+    // If userId or email is provided, verify user-specific acceptance as well
+    if (userId && localStorage.getItem(`needfix_notice_agreed_${userId}`) !== 'true') {
+      const user = this.getUsers().find((u) => u.id === userId);
+      if (!user?.hasAgreedNotice) return false;
     }
-    const user = this.getUsers().find(
-      (u) => (userId && u.id === userId) || (email && u.email?.toLowerCase() === email.toLowerCase())
-    );
-    return Boolean(user?.hasAgreedNotice);
+
+    if (email && localStorage.getItem(`needfix_notice_agreed_${email.toLowerCase()}`) !== 'true') {
+      const user = this.getUsers().find((u) => u.email?.toLowerCase() === email.toLowerCase());
+      if (!user?.hasAgreedNotice) return false;
+    }
+
+    return true;
   }
 
-  setAgreedImportantNotice(userId: string, email?: string): void {
+  setAgreedImportantNotice(userId?: string, email?: string): void {
     const agreedAt = new Date().toISOString();
+    // Mark visitor acceptance on device
+    localStorage.setItem('needfix_notice_agreed_visitor', 'true');
+    localStorage.setItem('needfix_notice_agreed_at', agreedAt);
+
     if (userId) {
       localStorage.setItem(`needfix_notice_agreed_${userId}`, 'true');
     }
@@ -229,9 +236,9 @@ class StorageService {
     }
   }
 
-  syncGoogleUser(googleUser: {
+  syncExternalUser(userAuth: {
     uid: string;
-    email: string;
+    email?: string;
     displayName: string;
     photoURL?: string;
     role?: 'customer' | 'technician' | 'admin';
@@ -239,16 +246,16 @@ class StorageService {
     const users = this.getUsers();
     let existing = users.find(
       (u) =>
-        (googleUser.email && u.email?.toLowerCase() === googleUser.email.toLowerCase()) ||
-        u.id === googleUser.uid
+        (userAuth.email && u.email?.toLowerCase() === userAuth.email.toLowerCase()) ||
+        u.id === userAuth.uid
     );
 
-    const hasAgreed = this.hasAgreedImportantNotice(googleUser.uid, googleUser.email);
+    const hasAgreed = this.hasAgreedImportantNotice(userAuth.uid, userAuth.email);
 
     if (existing) {
-      existing.name = googleUser.displayName || existing.name;
-      existing.avatarUrl = googleUser.photoURL || existing.avatarUrl;
-      if (googleUser.email && !existing.email) existing.email = googleUser.email;
+      existing.name = userAuth.displayName || existing.name;
+      existing.avatarUrl = userAuth.photoURL || existing.avatarUrl;
+      if (userAuth.email && !existing.email) existing.email = userAuth.email;
       if (hasAgreed && !existing.hasAgreedNotice) {
         existing.hasAgreedNotice = true;
       }
@@ -258,19 +265,20 @@ class StorageService {
     }
 
     const isAdmin =
-      googleUser.email.toLowerCase().includes('admin') ||
-      googleUser.email.toLowerCase() === 'needfix349@gmail.com' ||
-      googleUser.email === 'admin@needfix.in';
+      (userAuth.email && userAuth.email.toLowerCase().includes('admin')) ||
+      userAuth.email === 'admin@needfix.in' ||
+      userAuth.email?.toLowerCase() === 'needfix349@gmail.com' ||
+      userAuth.role === 'admin';
 
     const newUser: UserProfile = {
-      id: googleUser.uid || `google_${Date.now()}`,
-      name: googleUser.displayName || 'Google User',
-      email: googleUser.email,
+      id: userAuth.uid || `user_${Date.now()}`,
+      name: userAuth.displayName || 'NeedFix User',
+      email: userAuth.email,
       mobile: '',
       countryCode: '+91',
-      role: isAdmin ? 'admin' : (googleUser.role || 'customer'),
+      role: isAdmin ? 'admin' : (userAuth.role || 'customer'),
       avatarUrl:
-        googleUser.photoURL ||
+        userAuth.photoURL ||
         'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
       createdAt: new Date().toISOString(),
       isTechnicianRegistered: false,
@@ -283,33 +291,6 @@ class StorageService {
     return newUser;
   }
 
-  // --- DEMO / BYPASS PROFILE HELPERS ---
-  getDemoRoleUser(role: 'customer' | 'technician' | 'admin'): UserProfile {
-    const users = this.getUsers();
-    if (role === 'customer') {
-      const cust = users.find((u) => u.role === 'customer') || INITIAL_USERS[0];
-      return cust;
-    }
-    if (role === 'technician') {
-      const techUser = users.find((u) => u.role === 'technician') || INITIAL_USERS[1];
-      // Guarantee technician profile exists in technicians collection
-      const technicians = this.getTechnicians();
-      if (!technicians.some((t) => t.userId === techUser.id)) {
-        technicians.unshift(INITIAL_TECHNICIANS[0]);
-        localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
-      }
-      return techUser;
-    }
-    // admin
-    return users.find((u) => u.role === 'admin') || INITIAL_USERS[2];
-  }
-
-  loginAsDemoRole(role: 'customer' | 'technician' | 'admin'): UserProfile {
-    const user = this.getDemoRoleUser(role);
-    this.setCurrentUser(user);
-    return user;
-  }
-
   // --- TECHNICIANS ---
   getTechnicians(): TechnicianProfile[] {
     try {
@@ -317,6 +298,11 @@ class StorageService {
     } catch {
       return [];
     }
+  }
+
+  setTechnicians(technicians: TechnicianProfile[]): void {
+    localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+    this.notify();
   }
 
   // Auto-generate unique technician code e.g. NF-TECH-1007
@@ -697,16 +683,16 @@ class StorageService {
     return isFav;
   }
 
-  // --- RESET DEMO DATA ---
+  // --- RESET DATA ---
   resetToDefaults() {
-    localStorage.setItem(KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(INITIAL_TECHNICIANS));
-    localStorage.setItem(KEYS.LEADS, JSON.stringify(INITIAL_LEADS));
-    localStorage.setItem(KEYS.REVIEWS, JSON.stringify(INITIAL_REVIEWS));
-    localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(INITIAL_AUDIT_LOGS));
+    localStorage.setItem(KEYS.USERS, JSON.stringify([]));
+    localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
+    localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
+    localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
+    localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
     localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
     localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
-    localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(INITIAL_USERS[0]));
+    localStorage.removeItem(KEYS.CURRENT_USER);
     this.notify();
   }
 

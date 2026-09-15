@@ -24,6 +24,7 @@ import {
   Navigation,
   RefreshCw,
   Building2,
+  Mail,
 } from 'lucide-react';
 import { UserProfile, TechnicianProfile, UserLocation } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -113,14 +114,10 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
 
-  // 4. Mandatory Google OAuth Verification for Technicians
-  const [googleEmail, setGoogleEmail] = useState(currentUser.email || '');
-  const [isGoogleVerified, setIsGoogleVerified] = useState(
-    Boolean(currentUser.email && currentUser.email.includes('@'))
-  );
-  const [isGoogleAuthLoading, setIsGoogleAuthLoading] = useState(false);
+  // Email Contact for Technician
+  const [emailAddress, setEmailAddress] = useState(currentUser.email || '');
 
-  // 5. Mandatory Aadhaar Details (12-Digit UID + Dual-Side Document Upload)
+  // 4. Mandatory Aadhaar Details (12-Digit UID + Dual-Side Document Upload)
   const [aadhaarNumber, setAadhaarNumber] = useState('');
   const [aadhaarDocUrl, setAadhaarDocUrl] = useState<string>('');
   const [aadhaarBackDocUrl, setAadhaarBackDocUrl] = useState<string>('');
@@ -143,43 +140,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // Google OAuth triggers for Service Providers
-  const handleGoogleSignInForTechnician = async () => {
-    setIsGoogleAuthLoading(true);
-    setErrorMessage(null);
-    try {
-      const res = await supabaseService.signInWithGoogle({
-        customEmail: 'needfix349@gmail.com',
-        customName: companyName || currentUser.name || 'Verified Technician',
-        rolePreference: 'technician',
-      });
-      if (res.user?.email) {
-        setGoogleEmail(res.user.email);
-        setIsGoogleVerified(true);
-      }
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'Google verification failed.');
-    } finally {
-      setIsGoogleAuthLoading(false);
-    }
-  };
-
-  const handleInstantDemoGoogleVerify = () => {
-    const verifiedUser = storageService.syncGoogleUser({
-      uid: `supa_tech_${Date.now()}`,
-      email: 'needfix349@gmail.com',
-      displayName: companyName || currentUser.name || 'Verified Technician (Google)',
-      photoURL:
-        currentUser.avatarUrl ||
-        'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
-      role: 'technician',
-    });
-    setGoogleEmail('needfix349@gmail.com');
-    setIsGoogleVerified(true);
-    storageService.setCurrentUser(verifiedUser);
-    setErrorMessage(null);
-  };
 
   if (!isOpen) return null;
 
@@ -267,23 +227,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     }
   };
 
-  // Sample demo Aadhaar dual-side filler for quick evaluation
-  const handleUseSampleAadhaar = () => {
-    setAadhaarDocUrl(
-      'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=600&auto=format&fit=crop&q=80'
-    );
-    setAadhaarBackDocUrl(
-      'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&auto=format&fit=crop&q=80'
-    );
-    setAadhaarFileName('Sample-Aadhaar-Front.jpg');
-    setAadhaarBackFileName('Sample-Aadhaar-Back.jpg');
-    if (!aadhaarNumber) {
-      setAadhaarNumber('5432 8901 2345');
-    }
-    setIsGuidedKYCComplete(true);
-    setErrorMessage(null);
-  };
-
   // Clear all Aadhaar KYC documents
   const handleClearAadhaar = () => {
     setAadhaarDocUrl('');
@@ -313,12 +256,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     setErrorMessage(null);
 
     if (currentStep === 1) {
-      if (!isGoogleVerified || !googleEmail) {
-        setErrorMessage(
-          'Google Sign-In (Gmail authentication) is required before registering as a service provider.'
-        );
-        return;
-      }
       if (!companyName.trim()) {
         setErrorMessage('Please enter your Shop / Store / Company Name.');
         return;
@@ -422,6 +359,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       fullName: companyName.trim(), // Use Store/Company name as primary identity
       mobile: mobile.trim(),
       whatsappNumber: whatsappNumber.trim(),
+      email: emailAddress.trim() || currentUser.email || undefined,
       companyName: companyName.trim(),
       categoryId: primaryCat.id,
       categoryName: primaryCat.name,
@@ -465,11 +403,11 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
 
     const newProfile = await supabaseService.submitTechnicianApplication(applicationData);
 
-    // Update currentUser state to technician with verified email
+    // Update currentUser state to technician
     const updatedUser: UserProfile = {
       ...currentUser,
       role: 'technician',
-      email: googleEmail || currentUser.email || 'needfix349@gmail.com',
+      email: emailAddress.trim() || currentUser.email,
       isTechnicianRegistered: true,
     };
     storageService.setCurrentUser(updatedUser);
@@ -553,72 +491,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
           {/* STEP 1: SHOP & CONTACT INFORMATION */}
           {currentStep === 1 && (
             <form id="step-1-form" onSubmit={handleNext} className="space-y-4">
-              {/* Mandatory Google Sign-In (Gmail Authentication) for Technicians */}
-              {isGoogleVerified && googleEmail ? (
-                <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between shadow-2xs">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-white border border-emerald-300 flex items-center justify-center text-emerald-600 shadow-2xs shrink-0">
-                      <ShieldCheck size={18} />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
-                        <span>Google Account Verified</span>
-                        <CheckCircle2 size={13} className="text-emerald-600" />
-                      </p>
-                      <p className="text-[11px] text-emerald-800 font-mono font-medium truncate max-w-[200px] sm:max-w-xs">
-                        {googleEmail}
-                      </p>
-                    </div>
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full border border-emerald-200 shrink-0">
-                    Gmail OAuth
-                  </span>
-                </div>
-              ) : (
-                <div className="p-4 bg-amber-50/90 border-2 border-amber-300 rounded-2xl space-y-3">
-                  <div className="flex items-start gap-2.5">
-                    <div className="p-2 bg-amber-100 text-amber-800 rounded-xl shrink-0 mt-0.5">
-                      <ShieldCheck size={18} />
-                    </div>
-                    <div>
-                      <h4 className="text-xs font-black text-amber-950 uppercase tracking-wide">
-                        Google Sign-In (Gmail Authentication Required) *
-                      </h4>
-                      <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
-                        To protect customers and approve technician profiles, service providers must authenticate their Gmail account.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleGoogleSignInForTechnician}
-                      disabled={isGoogleAuthLoading}
-                      className="flex-1 py-2.5 px-3.5 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
-                        <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                        <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                        <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-                        <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-                      </svg>
-                      <span>{isGoogleAuthLoading ? 'Authenticating...' : 'Sign in with Google'}</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleInstantDemoGoogleVerify}
-                      className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer"
-                      title="Instant test verification with needfix349@gmail.com"
-                    >
-                      <Sparkles size={13} />
-                      <span>Verify with needfix349@gmail.com</span>
-                    </button>
-                  </div>
-                </div>
-              )}
-
               <div className="bg-blue-50 border border-blue-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-blue-900 text-xs">
                 <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
                 <p>
@@ -641,6 +513,23 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                     placeholder="e.g. Verma Electricals & AC Care, Sharma Sanitary Store"
                     className="w-full bg-transparent outline-none text-sm text-slate-900 font-bold"
                     required
+                  />
+                </div>
+              </div>
+
+              {/* Business Email */}
+              <div>
+                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
+                  Email Address <span className="text-slate-400 font-normal lowercase">(optional)</span>
+                </label>
+                <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
+                  <Mail size={18} className="text-slate-400 mr-2.5 shrink-0" />
+                  <input
+                    type="email"
+                    value={emailAddress}
+                    onChange={(e) => setEmailAddress(e.target.value)}
+                    placeholder="e.g. contact@yourstore.in"
+                    className="w-full bg-transparent outline-none text-sm text-slate-900 font-medium"
                   />
                 </div>
               </div>
@@ -847,7 +736,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                       }`}
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
-                        <CategoryLogo categoryId={cat.id} size="sm" className="w-8 h-8 rounded-xl shrink-0 shadow-xs" />
+                        <CategoryLogo categoryId={cat.id} size="sm" className="w-7 h-7 shrink-0" />
                         <div className="min-w-0">
                           <p className="font-bold text-xs text-slate-900 truncate">
                             {cat.name}
@@ -955,14 +844,19 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                       ) : (
                         <div
                           onClick={() => logoFileInputRef.current?.click()}
-                          className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white hover:bg-blue-50/40 flex flex-col items-center justify-center text-slate-400 shrink-0 cursor-pointer transition-all group"
-                          title="Click to select store logo"
+                          className="w-20 h-20 rounded-2xl border-2 border-dashed border-slate-300 hover:border-blue-500 bg-white hover:bg-blue-50/40 flex flex-col items-center justify-center text-slate-400 shrink-0 cursor-pointer transition-all group shadow-2xs"
+                          title="Click to select store logo or photo"
                         >
-                          <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:scale-105 transition-transform">
-                            <Store size={20} />
+                          <div className="relative flex items-center justify-center">
+                            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:scale-105 transition-transform">
+                              <Store size={18} />
+                            </div>
+                            <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                              <Camera size={10} />
+                            </span>
                           </div>
                           <span className="text-[9px] font-bold text-slate-500 group-hover:text-blue-600 mt-1 uppercase tracking-tight transition-colors">
-                            No Logo
+                            Upload Logo
                           </span>
                         </div>
                       )}
@@ -1065,15 +959,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                     <CheckCircle2 size={18} className="text-emerald-600 shrink-0 ml-2" />
                   )}
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-slate-500 mt-1">
-                  <span>Enter the 12 digits from your official Aadhaar card</span>
-                  <button
-                    type="button"
-                    onClick={() => setAadhaarNumber('5432 8901 2345')}
-                    className="text-blue-600 hover:underline font-medium cursor-pointer"
-                  >
-                    Demo: 5432 8901 2345
-                  </button>
+                <div className="text-[10px] text-slate-500 mt-1">
+                  <span>Enter the 12 digits from your official Aadhaar card (e.g. 5432 8901 2345)</span>
                 </div>
               </div>
 
@@ -1244,16 +1131,9 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                       </button>
                     </div>
 
-                    {/* Quick Demo & Reset Helpers */}
-                    <div className="flex items-center gap-3 text-[11px] text-slate-400 w-full sm:w-auto justify-between sm:justify-end">
-                      <button
-                        type="button"
-                        onClick={handleUseSampleAadhaar}
-                        className="text-blue-300 hover:text-blue-200 hover:underline font-medium cursor-pointer"
-                      >
-                        Use Demo Aadhaar
-                      </button>
-                      {(isFrontCaptured || isBackCaptured) && (
+                    {/* Reset Helper */}
+                    {(isFrontCaptured || isBackCaptured) && (
+                      <div className="flex items-center gap-3 text-[11px] text-slate-400 w-full sm:w-auto justify-end">
                         <button
                           type="button"
                           onClick={handleClearAadhaar}
@@ -1261,8 +1141,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                         >
                           Clear Photos
                         </button>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

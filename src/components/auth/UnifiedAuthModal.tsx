@@ -118,12 +118,6 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
     }
   };
 
-  const handleQuickDemo = (role: 'customer' | 'technician' | 'admin') => {
-    const user = storageService.loginAsDemoRole(role);
-    notifySuccess(user, false);
-    onClose();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
       <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col relative max-h-[95vh] overflow-y-auto">
@@ -220,36 +214,6 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
               )}
             </button>
           </form>
-
-          {/* Quick Demo Switcher */}
-          <div className="mt-5 pt-4 border-t border-slate-100">
-            <p className="text-[11px] font-semibold text-slate-400 text-center mb-2">
-              Or test with pre-configured demo profiles:
-            </p>
-            <div className="grid grid-cols-3 gap-2 text-[11px]">
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('customer')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-700 rounded-xl font-bold transition-all text-center cursor-pointer"
-              >
-                Customer
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('technician')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-700 text-slate-700 rounded-xl font-bold transition-all text-center cursor-pointer"
-              >
-                Verified Tech
-              </button>
-              <button
-                type="button"
-                onClick={() => handleQuickDemo('admin')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-purple-50 hover:text-purple-700 text-slate-700 rounded-xl font-bold transition-all text-center cursor-pointer"
-              >
-                Admin Desk
-              </button>
-            </div>
-          </div>
         </div>
       </div>
     </div>

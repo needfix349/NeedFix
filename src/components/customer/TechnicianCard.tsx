@@ -51,12 +51,6 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleCallClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!currentUser) {
-      if (onRequireAuth) {
-        onRequireAuth('call this technician');
-      }
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'call',
@@ -67,12 +61,6 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!currentUser) {
-      if (onRequireAuth) {
-        onRequireAuth('chat on WhatsApp with this technician');
-      }
-      return;
-    }
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
@@ -106,8 +94,8 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
                 >
                   <CategoryLogo
                     categoryId={catId}
-                    size="sm"
-                    className="w-4 h-4 rounded-lg shrink-0"
+                    size="xs"
+                    className="w-4 h-4 shrink-0"
                   />
                   <span>{catObj?.name || technician.categoryName}</span>
                 </span>
@@ -231,11 +219,10 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
           type="button"
           onClick={handleCallClick}
           className="py-2.5 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs shadow-blue-600/20 active:scale-[0.98]"
-          title={currentUser ? "Call Technician Directly" : "Login with phone number required to call"}
+          title="Call Technician Directly"
         >
           <Phone size={14} />
           <span>Call</span>
-          {!currentUser && <Lock size={10} className="text-blue-200 shrink-0 ml-0.5" />}
         </button>
 
         {/* WhatsApp Button */}
@@ -243,11 +230,10 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
           type="button"
           onClick={handleWhatsAppClick}
           className="py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-xs shadow-emerald-600/20 active:scale-[0.98]"
-          title={currentUser ? "Direct WhatsApp Chat" : "Login with phone number required to chat on WhatsApp"}
+          title="Direct WhatsApp Chat"
         >
           <MessageSquare size={14} />
           <span>WhatsApp</span>
-          {!currentUser && <Lock size={10} className="text-emerald-200 shrink-0 ml-0.5" />}
         </button>
       </div>
     </div>

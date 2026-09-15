@@ -315,12 +315,12 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
       </div>
 
-      {/* 20 OFFICIAL SERVICE CATEGORIES CAROUSEL/GRID */}
+      {/* 22 OFFICIAL SERVICE CATEGORIES CAROUSEL/GRID */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold font-display text-slate-900">Explore 20 Service Categories</h2>
-            <p className="text-xs text-slate-500">Pick a trade to browse verified specialists in your coverage area</p>
+            <h2 className="text-base font-bold font-display text-slate-900">Explore 22 Service Categories</h2>
+            <p className="text-xs text-slate-500">Pick a trade to browse verified specialists in your coverage area (22 Verified Trades)</p>
           </div>
           {selectedCategory !== 'all' && (
             <button
@@ -348,7 +348,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             <span className="text-[9px] opacity-80 font-mono">{approvedTechnicians.length} Pros</span>
           </button>
 
-          {/* 17 Categories */}
+          {/* 22 Categories */}
           {SERVICE_CATEGORIES.map((cat) => {
             const count = approvedTechnicians.filter((t) => t.categoryId === cat.id).length;
             const isSelected = selectedCategory === cat.id;
@@ -358,14 +358,14 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                 key={cat.id}
                 type="button"
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`p-2.5 rounded-2xl border text-center transition-all flex flex-col items-center justify-between gap-1 shadow-xs group ${
+                className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 shadow-xs group ${
                   isSelected
                     ? 'bg-blue-50/80 text-blue-900 border-blue-600 ring-2 ring-blue-600/30 shadow-md scale-105'
                     : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
                 }`}
               >
                 <div className="group-hover:scale-110 transition-transform">
-                  <CategoryLogo categoryId={cat.id} size="sm" />
+                  <CategoryLogo categoryId={cat.id} size="md" />
                 </div>
                 <span className="text-[11px] font-bold leading-tight line-clamp-2 max-w-full text-center">
                   {cat.name}
@@ -500,32 +500,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
 
       {/* TECHNICIANS LISTING GRID */}
       <div>
-        {/* Notice for guest users: login required to contact technicians */}
-        {!currentUser && (
-          <div className="mb-4 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 text-amber-950 shadow-xs">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl bg-amber-200/80 flex items-center justify-center text-amber-800 shrink-0">
-                <Lock size={16} />
-              </div>
-              <div>
-                <p className="text-xs font-bold text-slate-900">
-                  Login Required to Call, WhatsApp or Message Technicians
-                </p>
-                <p className="text-[11px] text-slate-600 mt-0.5">
-                  बिना लॉगिन किसी भी टेक्नीशियन से कॉल या व्हाट्सएप संपर्क उपलब्ध नहीं है। संपर्क के लिए पहले अपने फोन नंबर से लॉगिन करें।
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => onRequireAuth('contact technicians')}
-              className="w-full sm:w-auto py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 transition-colors flex items-center justify-center gap-1.5 shadow-xs"
-            >
-              <Phone size={13} />
-              <span>Login with Mobile</span>
-            </button>
-          </div>
-        )}
+
 
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>

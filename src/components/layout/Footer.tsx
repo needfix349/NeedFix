@@ -57,7 +57,7 @@ export const Footer: React.FC<FooterProps> = ({
             <a
               href={emailHref}
               className="py-3 px-5 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 active:scale-95 text-white rounded-2xl text-xs font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 text-center cursor-pointer"
-              title="Click to launch your native Email / Gmail app directly"
+              title="Click to launch your native email client directly"
             >
               <Mail size={16} />
               <span>Email Support (needfix349@gmail.com)</span>
