@@ -32,8 +32,16 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
+      const storedCustomerName = localStorage.getItem('needfix_customer_custom_name');
       const existingUser = storageService.getCurrentUser();
-      if (existingUser?.name) {
+      if (storedCustomerName) {
+        setFullName(storedCustomerName);
+      } else if (
+        existingUser?.name &&
+        existingUser.name !== 'NeedFix Customer' &&
+        existingUser.name !== 'Nadeem' &&
+        !existingUser.name.includes('Super Admin')
+      ) {
         setFullName(existingUser.name);
       } else {
         setFullName('');
@@ -70,6 +78,7 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
     setErrorMessage(null);
 
     try {
+      localStorage.setItem('needfix_customer_custom_name', cleanName);
       const existingUser = storageService.getCurrentUser();
       const isNew = !existingUser || existingUser.name !== cleanName;
 
@@ -83,9 +92,7 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
         email: existingUser?.email || '',
         role: existingUser?.role || 'customer',
         createdAt: existingUser?.createdAt || new Date().toISOString(),
-        avatarUrl:
-          existingUser?.avatarUrl ||
-          `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`,
+        avatarUrl: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}`,
         location: userLoc,
         isTechnicianRegistered: existingUser?.isTechnicianRegistered || false,
       };
@@ -119,8 +126,8 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden flex flex-col relative max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-xs animate-in fade-in duration-200 overflow-x-hidden max-w-full">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-md overflow-hidden flex flex-col relative max-h-[95vh] overflow-y-auto box-border">
         {/* Header decoration */}
         <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 text-white p-6 relative">
           <button

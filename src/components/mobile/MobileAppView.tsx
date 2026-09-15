@@ -18,7 +18,6 @@ import {
   Clock,
   CheckCircle2,
   Navigation,
-  LayoutGrid,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, UserProfile, ServiceLead } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -215,22 +214,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                 </div>
 
                 <div className="grid grid-cols-4 gap-2">
-                  {/* All Services */}
-                  <button
-                    type="button"
-                    onClick={() => setSelectedCategory('all')}
-                    className={`p-2 rounded-2xl border text-center flex flex-col items-center justify-center gap-1 transition-all ${
-                      selectedCategory === 'all'
-                        ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
-                        : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                    }`}
-                  >
-                    <span className="text-xl">🌟</span>
-                    <span className="text-[10px] font-bold leading-tight truncate max-w-full">
-                      All Trades
-                    </span>
-                  </button>
-
                   {/* 22 Specific Categories */}
                   {SERVICE_CATEGORIES.map((cat) => {
                     const isSelected = selectedCategory === cat.id;
@@ -238,8 +221,8 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                       <button
                         key={cat.id}
                         type="button"
-                        onClick={() => setSelectedCategory(cat.id)}
-                        className={`p-1.5 rounded-2xl border text-center flex flex-col items-center justify-between gap-1 transition-all group ${
+                        onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
+                        className={`p-1.5 rounded-2xl border text-center flex flex-col items-center justify-between gap-1 transition-all group cursor-pointer ${
                           isSelected
                             ? 'bg-blue-50 text-blue-900 border-blue-600 ring-2 ring-blue-600/30'
                             : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -476,7 +459,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                 />
                 <div className="flex-1">
                   <h4 className="text-sm font-bold text-slate-900">{currentUser.name}</h4>
-                  <p className="text-xs text-slate-500">+91 {currentUser.mobile}</p>
                   <span className="inline-block mt-1 text-[10px] uppercase font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
                     {currentUser.role} Account
                   </span>

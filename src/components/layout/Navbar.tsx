@@ -94,8 +94,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   return (
-    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs w-full">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4 w-full">
         {/* Left: Top Bar Back Arrow + Brand Logo & Tagline */}
         <div className="flex items-center gap-2.5 sm:gap-4">
           {/* Functional Top Bar Back Arrow (🔙 / ←) */}
@@ -258,8 +258,14 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setShowProfileMenu(!showProfileMenu)}
-                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer"
+                id="user-profile-menu-btn"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProfileMenu((prev) => !prev);
+                }}
+                className="flex items-center gap-2 p-1.5 pl-2.5 rounded-2xl border border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50 transition-colors shadow-xs cursor-pointer select-none"
+                aria-expanded={showProfileMenu}
+                aria-haspopup="true"
               >
                 <div className="text-left flex flex-col justify-center">
                   <p className="text-xs font-extrabold text-slate-900 leading-tight max-w-[85px] sm:max-w-[140px] truncate">
@@ -283,34 +289,59 @@ export const Navbar: React.FC<NavbarProps> = ({
 
               {/* Profile Dropdown Menu */}
               {showProfileMenu && (
-                <div className="absolute right-0 mt-2 w-64 bg-white rounded-3xl shadow-2xl border border-slate-200 p-3 z-50 animate-in fade-in space-y-2">
-                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold text-xs text-slate-900">{currentUser.name}</span>
-                      <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
-                        {currentUser.role}
-                      </span>
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setShowProfileMenu(false)}
+                    aria-hidden="true"
+                  />
+                  <div
+                    className="absolute right-0 top-full mt-2 w-64 max-w-[calc(100vw-1.5rem)] bg-white rounded-3xl shadow-2xl border border-slate-200 p-3 z-50 animate-in fade-in space-y-2"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-xs text-slate-900">{currentUser.name}</span>
+                        <span className="text-[10px] uppercase font-bold tracking-wider bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          {currentUser.role}
+                        </span>
+                      </div>
+                      {currentUser.location && (
+                        <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-1">
+                          <MapPin size={11} className="text-red-500" />
+                          <span>{currentUser.location.area}, {currentUser.location.city}</span>
+                        </p>
+                      )}
                     </div>
-                    <p className="text-xs text-slate-500 font-mono">+91 {currentUser.mobile}</p>
-                    {currentUser.location && (
-                      <p className="text-[11px] text-slate-500 flex items-center gap-1 pt-1">
-                        <MapPin size={11} className="text-red-500" />
-                        <span>{currentUser.location.area}, {currentUser.location.city}</span>
-                      </p>
-                    )}
-                  </div>
 
-                  <div className="space-y-1 text-xs font-semibold text-slate-700">
-                    <button
-                      onClick={() => {
-                        onNavigate('home');
-                        setShowProfileMenu(false);
-                      }}
-                      className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center gap-2"
-                    >
-                      <Sparkles size={14} className="text-blue-600" />
-                      <span>Find Services</span>
-                    </button>
+                    <div className="space-y-1 text-xs font-semibold text-slate-700">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onOpenAuth();
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700"
+                      >
+                        <div className="flex items-center gap-2">
+                          <User size={14} className="text-blue-600" />
+                          <span>Change / Edit Name</span>
+                        </div>
+                        <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                          Edit
+                        </span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          onNavigate('home');
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center gap-2"
+                      >
+                        <Sparkles size={14} className="text-blue-600" />
+                        <span>Find Services</span>
+                      </button>
 
                     {technicianProfile ? (
                       <button
@@ -387,7 +418,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </button>
                   </div>
                 </div>
-              )}
+              </>
+            )}
             </div>
           ) : (
             <button

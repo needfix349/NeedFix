@@ -252,8 +252,14 @@ class StorageService {
 
     const hasAgreed = this.hasAgreedImportantNotice(userAuth.uid, userAuth.email);
 
+    const storedCustomName = localStorage.getItem('needfix_customer_custom_name');
+
     if (existing) {
-      existing.name = userAuth.displayName || existing.name;
+      if (storedCustomName) {
+        existing.name = storedCustomName;
+      } else if (!existing.name || existing.name === 'NeedFix Customer' || existing.name === 'NeedFix User' || (existing.role === 'customer' && existing.name === 'Nadeem')) {
+        existing.name = userAuth.displayName || existing.name;
+      }
       existing.avatarUrl = userAuth.photoURL || existing.avatarUrl;
       if (userAuth.email && !existing.email) existing.email = userAuth.email;
       if (hasAgreed && !existing.hasAgreedNotice) {
@@ -272,7 +278,7 @@ class StorageService {
 
     const newUser: UserProfile = {
       id: userAuth.uid || `user_${Date.now()}`,
-      name: userAuth.displayName || 'NeedFix User',
+      name: storedCustomName || userAuth.displayName || 'NeedFix User',
       email: userAuth.email,
       mobile: '',
       countryCode: '+91',

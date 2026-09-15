@@ -150,8 +150,8 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-3xl max-h-[92vh] overflow-hidden flex flex-col relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200 overflow-x-hidden max-w-full">
+      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col relative box-border">
         {/* Top Cover Banner */}
         <div className="h-32 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 relative p-4 shrink-0">
           <div className="absolute top-4 right-4 flex items-center gap-2">

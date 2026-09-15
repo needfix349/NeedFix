@@ -28,8 +28,8 @@ export const HelpSupportModal: React.FC<HelpSupportModalProps> = ({
   const emailHref = 'mailto:needfix349@gmail.com?subject=NeedFix%20Complaint%2FSupport';
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in">
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden text-slate-800 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/70 backdrop-blur-xs animate-in fade-in overflow-x-hidden max-w-full">
+      <div className="bg-white rounded-3xl max-w-[calc(100vw-1.5rem)] sm:max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden text-slate-800 flex flex-col max-h-[90vh] box-border">
         {/* Header */}
         <div className="p-5 bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white flex items-center justify-between">
           <div className="flex items-center gap-3">

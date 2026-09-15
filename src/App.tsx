@@ -47,9 +47,7 @@ export default function App() {
   const [authPromptMessage, setAuthPromptMessage] = useState<string | undefined>(undefined);
   const [authInitialRole, setAuthInitialRole] = useState<'customer' | 'technician'>('customer');
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
-  const [showImportantNoticeModal, setShowImportantNoticeModal] = useState<boolean>(() => {
-    return !storageService.hasAgreedImportantNotice();
-  });
+  const [showImportantNoticeModal, setShowImportantNoticeModal] = useState<boolean>(false);
   const [showTechRegistrationModal, setShowTechRegistrationModal] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState<TechnicianProfile | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
@@ -101,13 +99,22 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Check if visitor has accepted Important Notice
-    if (!storageService.hasAgreedImportantNotice()) {
-      setShowImportantNoticeModal(true);
-    }
-
     syncState();
     const unsubStorage = storageService.subscribe(syncState);
+
+    // Check if initial name input flow is needed (first visit or name not entered yet)
+    const user = storageService.getCurrentUser();
+    const storedCustomName = localStorage.getItem('needfix_customer_custom_name');
+    if (
+      !storedCustomName &&
+      (!user ||
+        !user.name ||
+        user.name === 'NeedFix Customer' ||
+        user.name === 'Nadeem' ||
+        user.name.includes('Super Admin'))
+    ) {
+      setShowAuthModal(true);
+    }
 
     // Load live approved technicians from Supabase database
     supabaseService.getApprovedTechnicians().then((liveTechs) => {
@@ -117,30 +124,43 @@ export default function App() {
     }).catch(console.warn);
 
     const handleSupabaseUser = (sbUser: any) => {
-      const fullName =
-        sbUser.user_metadata?.full_name ||
-        sbUser.user_metadata?.name ||
-        sbUser.email?.split('@')[0] ||
-        'NeedFix Customer';
+      const storedCustomerName = localStorage.getItem('needfix_customer_custom_name');
+      const existingUser = storageService.getCurrentUser();
+      const isSuperAdminEmail = sbUser.email?.toLowerCase() === 'needfix349@gmail.com';
+
+      // Use stored customer name if available, otherwise prioritize existing customer name, or fall back to sbUser name
+      let fullName: string;
+      if (storedCustomerName) {
+        fullName = storedCustomerName;
+      } else if (
+        existingUser?.name &&
+        existingUser.name !== 'NeedFix Customer' &&
+        existingUser.name !== 'NeedFix User' &&
+        (!isSuperAdminEmail || existingUser.role !== 'admin')
+      ) {
+        fullName = existingUser.name;
+      } else {
+        fullName =
+          sbUser.user_metadata?.full_name ||
+          sbUser.user_metadata?.name ||
+          sbUser.email?.split('@')[0] ||
+          'NeedFix Customer';
+      }
+
       const avatar =
         sbUser.user_metadata?.avatar_url ||
         sbUser.user_metadata?.picture ||
-        'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80';
+        `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(fullName)}`;
 
       const synced = storageService.syncExternalUser({
         uid: sbUser.id,
         email: sbUser.email,
         displayName: fullName,
         photoURL: avatar,
-        role: 'customer',
+        role: existingUser?.role || 'customer',
       });
       setCurrentUser(synced);
       supabaseService.upsertUserInDatabase(synced).catch(console.warn);
-
-      // Check if user has agreed to the mandatory Important Notice
-      if (!storageService.hasAgreedImportantNotice(synced.id, synced.email)) {
-        setShowImportantNoticeModal(true);
-      }
     };
 
     // 1. Check existing session on redirect/reload
@@ -245,13 +265,15 @@ export default function App() {
 
   // Logout
   const handleLogout = () => {
+    localStorage.removeItem('needfix_customer_custom_name');
     storageService.setCurrentUser(null);
     setCurrentUser(null);
     setActiveView('home');
+    supabase.auth.signOut().catch(() => {});
   };
 
   return (
-    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white">
+    <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white w-full max-w-full overflow-x-hidden">
       {/* Offline PWA Connectivity Indicator */}
       <OfflineIndicator />
 
@@ -290,7 +312,7 @@ export default function App() {
       />
 
       {/* Main View Router */}
-      <main className="flex-1 pb-16">
+      <main className="flex-1 pb-16 w-full max-w-full overflow-x-hidden">
         {activeView === 'home' && (
           <CustomerHome
             technicians={technicians}

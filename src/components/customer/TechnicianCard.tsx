@@ -76,7 +76,7 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
   return (
     <div
       onClick={() => onSelectTechnician(technician)}
-      className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-xl hover:border-blue-300 transition-all duration-200 overflow-hidden flex flex-col justify-between group cursor-pointer relative"
+      className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-xl hover:border-blue-300 transition-all duration-200 overflow-hidden flex flex-col justify-between group cursor-pointer relative w-full max-w-full box-border"
     >
       <div className="p-4 sm:p-5 space-y-3.5">
         {/* Top bar: Category badges, Verified badge & Favorite button */}

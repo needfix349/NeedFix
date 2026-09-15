@@ -485,9 +485,9 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
       role="dialog"
       aria-modal="true"
       aria-label="Aadhaar KYC Camera Verification"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-3 sm:p-4 backdrop-blur-sm animate-fade-in overflow-x-hidden max-w-full"
     >
-      <div className="w-full max-w-xl bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl border border-slate-700/80 flex flex-col max-h-[92vh]">
+      <div className="w-full max-w-[calc(100vw-1.5rem)] sm:max-w-xl bg-slate-900 text-white rounded-3xl overflow-hidden shadow-2xl border border-slate-700/80 flex flex-col max-h-[92vh] box-border">
         {/* MODAL HEADER */}
         <div className="px-4 sm:px-6 py-3.5 bg-slate-950/80 border-b border-slate-800 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">

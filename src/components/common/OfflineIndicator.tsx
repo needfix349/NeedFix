@@ -22,9 +22,11 @@ export const OfflineIndicator: React.FC = () => {
   if (isOnline) return null;
 
   return (
-    <aside aria-label="Offline status" className="fixed bottom-4 left-4 z-50 flex items-center gap-2 rounded-xl bg-slate-900/95 border border-slate-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-xs animate-bounce-subtle">
-      <WifiOff size={15} className="text-amber-400 shrink-0" />
-      <span>Offline Mode — Cached data and verified technicians ready</span>
+    <aside aria-label="Offline status" className="fixed bottom-4 left-4 right-4 sm:right-auto max-w-[calc(100vw-2rem)] sm:max-w-md z-50 flex items-center justify-between gap-2 rounded-xl bg-slate-900/95 border border-slate-700 px-3.5 py-2 text-xs font-semibold text-white shadow-xl backdrop-blur-xs animate-bounce-subtle box-border">
+      <div className="flex items-center gap-2 min-w-0">
+        <WifiOff size={15} className="text-amber-400 shrink-0" />
+        <span className="truncate">Offline Mode — Cached data ready</span>
+      </div>
       <button
         type="button"
         onClick={() => window.location.reload()}

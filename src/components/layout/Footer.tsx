@@ -32,8 +32,8 @@ export const Footer: React.FC<FooterProps> = ({
   const emailHref = 'mailto:needfix349@gmail.com?subject=NeedFix%20Complaint%2FSupport';
 
   return (
-    <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 text-xs mt-auto">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10">
+    <footer className="bg-slate-900 text-slate-400 py-12 border-t border-slate-800 text-xs mt-auto w-full max-w-full overflow-hidden">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 space-y-10 w-full">
         {/* TOP CALLOUT: File a Complaint / Need Help & Direct Action */}
         <div className="p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 border border-slate-800 shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1.5">

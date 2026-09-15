@@ -16,7 +16,6 @@ import {
   Calendar,
   Lock,
   Phone,
-  LayoutGrid,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, UserProfile } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -199,7 +198,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const activeCategoryObj = SERVICE_CATEGORIES.find((c) => c.id === selectedCategory);
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-3.5 sm:px-4 py-4 sm:py-6 space-y-6 w-full max-w-full overflow-hidden">
       {/* HERO / SEARCH BAR & LOCATION BAR (Optimized for Mobile) */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 rounded-2xl sm:rounded-3xl p-3.5 sm:p-7 text-white shadow-xl relative overflow-hidden">
         <div className="relative z-10 space-y-2.5 sm:space-y-4 max-w-3xl">
@@ -333,32 +332,16 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
 
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2.5">
-          {/* "All" button */}
-          <button
-            type="button"
-            onClick={() => setSelectedCategory('all')}
-            className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 shadow-xs ${
-              selectedCategory === 'all'
-                ? 'bg-blue-600 text-white border-blue-600 shadow-blue-600/20 scale-105'
-                : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-            }`}
-          >
-            <span className="text-2xl">🌟</span>
-            <span className="text-[11px] font-bold leading-tight truncate max-w-full">All Services</span>
-            <span className="text-[9px] opacity-80 font-mono">{approvedTechnicians.length} Pros</span>
-          </button>
-
           {/* 22 Categories */}
           {SERVICE_CATEGORIES.map((cat) => {
-            const count = approvedTechnicians.filter((t) => t.categoryId === cat.id).length;
             const isSelected = selectedCategory === cat.id;
 
             return (
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => setSelectedCategory(cat.id)}
-                className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-1.5 shadow-xs group ${
+                onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
+                className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-2 shadow-xs group cursor-pointer ${
                   isSelected
                     ? 'bg-blue-50/80 text-blue-900 border-blue-600 ring-2 ring-blue-600/30 shadow-md scale-105'
                     : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
@@ -369,13 +352,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                 </div>
                 <span className="text-[11px] font-bold leading-tight line-clamp-2 max-w-full text-center">
                   {cat.name}
-                </span>
-                <span
-                  className={`text-[9px] font-semibold font-mono px-1.5 py-0.5 rounded-full ${
-                    isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {count > 0 ? `${count} active` : (cat.badge || 'Verified')}
                 </span>
               </button>
             );
