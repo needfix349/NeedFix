@@ -245,4 +245,55 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     ],
     badge: 'Logistics',
   },
+  // 23. Cleaner / Maid
+  {
+    id: 'cleaner-maid',
+    name: 'Cleaner / Maid',
+    hindiName: 'सफाई कर्मचारी / मेड',
+    icon: '🧹',
+    lucideIconName: 'Sparkles',
+    description: 'Full house deep cleaning, daily maid, bathroom sanitization, kitchen degreasing & housekeeping',
+    popularServices: [
+      'Full Home Deep Cleaning',
+      'Bathroom & Toilet Deep Clean',
+      'Kitchen Deep Cleaning & Degreasing',
+      'Daily House Maid & Floor Mopping',
+      'Sofa & Carpet Shampoo Cleaning',
+    ],
+    badge: 'Cleaning',
+  },
+  // 24. Babysitter / Nurse
+  {
+    id: 'babysitter-nurse',
+    name: 'Babysitter / Nurse',
+    hindiName: 'बेबीसिटर / नर्स (केयरटेकर)',
+    icon: '👶',
+    lucideIconName: 'HeartHandshake',
+    description: 'Certified infant care, professional babysitters, elderly patient nursing, day & night nanny assistance',
+    popularServices: [
+      'Infant & Toddler Babysitting',
+      'Elderly Patient Care Assistant',
+      'Post-Surgery Nursing Support',
+      'Full-Day / 24-Hour Nanny',
+      'Newborn Baby Care & Mother Assistance',
+    ],
+    badge: 'Care',
+  },
+  // 25. Packers & Movers Helper
+  {
+    id: 'packers-movers-helper',
+    name: 'Packers & Movers Helper',
+    hindiName: 'पैकर्स एवं मूवर्स हेल्पर',
+    icon: '📦',
+    lucideIconName: 'Package',
+    description: 'Household luggage packing, loading & unloading helpers, carton bubble wrapping, shifting manpower',
+    popularServices: [
+      'Loading & Unloading Helper',
+      'Heavy Furniture Shifting & Dismantling',
+      'Carton Box Bubble Packing & Taping',
+      'Intra-City House Shifting Labor',
+      'Luggage Transport & Relocation Assistance',
+    ],
+    badge: 'Moving',
+  },
 ];

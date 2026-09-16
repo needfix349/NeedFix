@@ -1,15 +1,17 @@
 import React, { useState } from 'react';
-import { ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { ShieldAlert, CheckCircle2, X } from 'lucide-react';
 
 interface ImportantNoticeModalProps {
   isOpen: boolean;
   onAgree: () => void;
+  onClose?: () => void;
   userName?: string;
 }
 
 export const ImportantNoticeModal: React.FC<ImportantNoticeModalProps> = ({
   isOpen,
   onAgree,
+  onClose,
   userName,
 }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -22,6 +24,14 @@ export const ImportantNoticeModal: React.FC<ImportantNoticeModalProps> = ({
       onAgree();
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDismiss = () => {
+    if (onClose) {
+      onClose();
+    } else {
+      handleAgreeClick();
     }
   };
 
@@ -38,21 +48,32 @@ export const ImportantNoticeModal: React.FC<ImportantNoticeModalProps> = ({
         aria-labelledby="important-notice-title"
       >
         {/* Compact Accent Header Strip */}
-        <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 flex items-center gap-2.5 text-white">
-          <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-sm shrink-0 shadow-xs">
-            ⚠️
+        <div className="bg-gradient-to-r from-amber-500 to-amber-600 px-4 py-2.5 flex items-center justify-between text-white">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-white/20 flex items-center justify-center text-sm shrink-0 shadow-xs">
+              ⚠️
+            </div>
+            <div className="flex-1 min-w-0">
+              <h2
+                id="important-notice-title"
+                className="text-xs sm:text-sm font-bold text-white tracking-tight truncate"
+              >
+                Important Notice / महत्वपूर्ण सूचना
+              </h2>
+              <p className="text-amber-100 text-[10px] font-normal truncate">
+                {userName ? `Mandatory disclaimer for ${userName}` : 'Mandatory disclaimer for all customers & services'}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <h2
-              id="important-notice-title"
-              className="text-xs sm:text-sm font-bold text-white tracking-tight truncate"
-            >
-              Important Notice / महत्वपूर्ण सूचना
-            </h2>
-            <p className="text-amber-100 text-[10px] font-normal truncate">
-              {userName ? `Mandatory disclaimer for ${userName}` : 'Mandatory disclaimer for all customers & services'}
-            </p>
-          </div>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="p-1 rounded-lg hover:bg-white/20 text-white/90 hover:text-white transition-colors cursor-pointer shrink-0 ml-2"
+            title="Dismiss Notice"
+            aria-label="Close"
+          >
+            <X size={17} />
+          </button>
         </div>
 
         {/* Modal Body - Tighter padding and slightly smaller text */}

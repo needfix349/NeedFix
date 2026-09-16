@@ -170,7 +170,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
       setTempLocation(loc);
       setCustomArea(loc.area || loc.city);
       setCustomAddress(loc.address || `${loc.area}, ${loc.city}`);
-      setGpsStatus('locked');
+      setGpsStatus(loc.isGpsLocked ? 'locked' : 'manual');
 
       // Attempt to align state
       if (loc.state) {
@@ -180,6 +180,9 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
         if (matchingState) {
           setSelectedStateObj(matchingState);
         }
+      }
+      if (!loc.isGpsLocked) {
+        setGpsError('Browser GPS permission was not granted. Showing nearest district or choose from the list below.');
       }
     } catch (err: any) {
       console.warn('GPS detection notice:', err);

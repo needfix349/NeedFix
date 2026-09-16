@@ -103,7 +103,7 @@ export const Footer: React.FC<FooterProps> = ({
           {/* Col 2: Featured Service Categories */}
           <div>
             <h4 className="font-bold text-white mb-3 uppercase tracking-wider text-[11px] flex items-center gap-1.5">
-              <span>All 22 Service Categories</span>
+              <span>All {SERVICE_CATEGORIES.length} Service Categories</span>
             </h4>
             <ul className="space-y-1.5 text-[11px] text-slate-400">
               {SERVICE_CATEGORIES.slice(0, 7).map((cat) => (
@@ -114,7 +114,7 @@ export const Footer: React.FC<FooterProps> = ({
               ))}
               <li className="text-blue-400 font-semibold pt-1 flex items-center gap-1">
                 <ChevronRight size={10} />
-                <span>+ 15 More Specialized Categories</span>
+                <span>+ {SERVICE_CATEGORIES.length - 7} More Specialized Categories</span>
               </li>
             </ul>
           </div>

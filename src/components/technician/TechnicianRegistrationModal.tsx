@@ -24,7 +24,8 @@ import {
   Navigation,
   RefreshCw,
   Building2,
-  Mail,
+  Minus,
+  Plus,
 } from 'lucide-react';
 import { UserProfile, TechnicianProfile, UserLocation } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -113,9 +114,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
   const [logoLoadError, setLogoLoadError] = useState<boolean>(false);
   const [showLogoUrlInput, setShowLogoUrlInput] = useState(false);
   const logoFileInputRef = useRef<HTMLInputElement>(null);
-
-  // Email Contact for Technician
-  const [emailAddress, setEmailAddress] = useState(currentUser.email || '');
 
   // 4. Mandatory Aadhaar Details (12-Digit UID + Dual-Side Document Upload)
   const [aadhaarNumber, setAadhaarNumber] = useState('');
@@ -359,7 +357,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       fullName: companyName.trim(), // Use Store/Company name as primary identity
       mobile: mobile.trim(),
       whatsappNumber: whatsappNumber.trim(),
-      email: emailAddress.trim() || currentUser.email || undefined,
+      email: currentUser.email || undefined,
       companyName: companyName.trim(),
       categoryId: primaryCat.id,
       categoryName: primaryCat.name,
@@ -407,7 +405,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     const updatedUser: UserProfile = {
       ...currentUser,
       role: 'technician',
-      email: emailAddress.trim() || currentUser.email,
+      email: currentUser.email,
       isTechnicianRegistered: true,
     };
     storageService.setCurrentUser(updatedUser);
@@ -513,23 +511,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                     placeholder="e.g. Verma Electricals & AC Care, Sharma Sanitary Store"
                     className="w-full bg-transparent outline-none text-sm text-slate-900 font-bold"
                     required
-                  />
-                </div>
-              </div>
-
-              {/* Business Email */}
-              <div>
-                <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-                  Email Address <span className="text-slate-400 font-normal lowercase">(optional)</span>
-                </label>
-                <div className="flex items-center rounded-2xl border border-slate-300 bg-slate-50/50 px-3.5 py-2.5 focus-within:border-blue-600 focus-within:ring-2 focus-within:ring-blue-100">
-                  <Mail size={18} className="text-slate-400 mr-2.5 shrink-0" />
-                  <input
-                    type="email"
-                    value={emailAddress}
-                    onChange={(e) => setEmailAddress(e.target.value)}
-                    placeholder="e.g. contact@yourstore.in"
-                    className="w-full bg-transparent outline-none text-sm text-slate-900 font-medium"
                   />
                 </div>
               </div>
@@ -658,50 +639,92 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
               </div>
 
                 {/* Service Coverage Radius Slider - 1km to 20km Custom Range */}
-                <div className="pt-1 bg-slate-50 p-3 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="pt-1 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🎯 Service Coverage Radius</span>
-                      <span className="text-[10px] text-slate-500 font-normal">(1 km - 20 km)</span>
-                    </label>
-                    <span className="font-extrabold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200 text-xs">
-                      {coverageRadiusKm} km
-                    </span>
+                    <div>
+                      <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>🎯 Service Coverage Radius</span>
+                      </label>
+                      <p className="text-[10px] text-slate-500 font-normal">
+                        Select exact service distance around your workshop (1 km to 20 km)
+                      </p>
+                    </div>
+
+                    {/* Interactive Stepper & Value Badge */}
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setCoverageRadiusKm((prev) => Math.max(1, prev - 1))}
+                        disabled={coverageRadiusKm <= 1}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold transition-all cursor-pointer"
+                        title="Decrease 1 km"
+                      >
+                        <Minus size={14} />
+                      </button>
+
+                      <div className="flex items-center justify-center min-w-[58px] px-1 text-center font-extrabold text-blue-600 text-sm">
+                        <span>{coverageRadiusKm}</span>
+                        <span className="text-[11px] font-semibold text-slate-500 ml-0.5">km</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setCoverageRadiusKm((prev) => Math.min(20, prev + 1))}
+                        disabled={coverageRadiusKm >= 20}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold transition-all cursor-pointer"
+                        title="Increase 1 km"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Smooth Range Slider (1 to 20 km, step 1) */}
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    step={1}
-                    value={coverageRadiusKm}
-                    onChange={(e) => setCoverageRadiusKm(Number(e.target.value))}
-                    className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                  />
+                  {/* Smooth Real-Time Range Slider (1 to 20 km with dynamic fill & touch-none) */}
+                  <div className="relative pt-1">
+                    <input
+                      type="range"
+                      min={1}
+                      max={20}
+                      step={1}
+                      value={coverageRadiusKm}
+                      onInput={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value, 10);
+                        if (!isNaN(val)) setCoverageRadiusKm(Math.min(20, Math.max(1, val)));
+                      }}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) setCoverageRadiusKm(Math.min(20, Math.max(1, val)));
+                      }}
+                      className="w-full accent-blue-600 cursor-pointer h-2.5 rounded-lg appearance-none touch-none"
+                      style={{
+                        background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((coverageRadiusKm - 1) / 19) * 100}%, #e2e8f0 ${((coverageRadiusKm - 1) / 19) * 100}%, #e2e8f0 100%)`,
+                      }}
+                    />
+                  </div>
 
-                  {/* Quick Preset Buttons */}
-                  <div className="flex items-center justify-between gap-1.5">
-                    {[1, 3, 5, 10, 15, 20].map((step) => (
+                  {/* Quick One-Tap Preset Buttons */}
+                  <div className="flex items-center justify-between gap-1 sm:gap-1.5">
+                    {[1, 2, 3, 5, 8, 10, 15, 20].map((step) => (
                       <button
                         key={step}
                         type="button"
                         onClick={() => setCoverageRadiusKm(step)}
-                        className={`flex-1 py-1 px-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        className={`flex-1 py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all border cursor-pointer ${
                           coverageRadiusKm === step
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs scale-105 z-10'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        {step} km
+                        {step}k
                       </button>
                     ))}
                   </div>
 
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
-                    <span>1 km (Neighborhood)</span>
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>1 km (Local)</span>
+                    <span>5 km (City Zone)</span>
                     <span>10 km (Standard)</span>
-                    <span>20 km (Max Radius)</span>
+                    <span>20 km (Max)</span>
                   </div>
                 </div>
             </form>

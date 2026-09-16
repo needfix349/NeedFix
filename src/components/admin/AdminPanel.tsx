@@ -631,7 +631,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onChange={(e) => setSelectedCategory(e.target.value)}
               className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none"
             >
-              <option value="all">All 22 Categories</option>
+              <option value="all">All Categories ({SERVICE_CATEGORIES.length})</option>
               {SERVICE_CATEGORIES.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.icon} {c.name}

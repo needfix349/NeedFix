@@ -18,6 +18,8 @@ export interface UserLocation {
   area: string;
   state?: string;
   address?: string;
+  isGpsLocked?: boolean;
+  accuracyMeters?: number;
 }
 
 export interface UserProfile {

@@ -22,6 +22,9 @@ import {
   BikeRepair3DIcon,
   HomeTuition3DIcon,
   GoodsTransport3DIcon,
+  CleanerMaid3DIcon,
+  BabysitterNurse3DIcon,
+  PackersMoversHelper3DIcon,
 } from './category3DIcons';
 import { Wrench } from 'lucide-react';
 
@@ -36,287 +39,336 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
   className = '',
   size = 'md',
 }) => {
-  const sizeClasses = {
-    xs: 'w-5 h-5 rounded-md p-0.5',
-    sm: 'w-8 h-8 rounded-xl p-1',
-    md: 'w-11 h-11 rounded-2xl p-1.5',
-    lg: 'w-16 h-16 rounded-2xl p-2',
-    xl: 'w-20 h-20 rounded-3xl p-2.5',
+  const sizeClasses: Record<string, { container: string; inner: string; padding: string }> = {
+    xs: { container: 'w-6 h-6 rounded-lg p-0.5', inner: 'rounded-[6px]', padding: 'p-0.5' },
+    sm: { container: 'w-10 h-10 rounded-xl p-1', inner: 'rounded-[9px]', padding: 'p-1' },
+    md: { container: 'w-14 h-14 rounded-2xl p-1.5', inner: 'rounded-[12px]', padding: 'p-1.5' },
+    lg: { container: 'w-16 h-16 rounded-2xl p-2', inner: 'rounded-[13px]', padding: 'p-2' },
+    xl: { container: 'w-20 h-20 rounded-3xl p-2.5', inner: 'rounded-[18px]', padding: 'p-2' },
   };
 
-  const currentSizeClass = sizeClasses[size] || sizeClasses.md;
+  const currentConfig = sizeClasses[size] || sizeClasses.md;
+
+  // Render fancy standard badge with specular highlights, rich colored shadows & high-contrast stage
+  const renderBadge = (
+    gradientClass: string,
+    borderClass: string,
+    shadowClass: string,
+    title: string,
+    IconComponent: React.FC<{ className?: string }>
+  ) => {
+    // If className specifies explicit width/height (e.g. w-8 h-8), let it take precedence
+    const hasExplicitDimensions = /\b(w-|h-)\S+/.test(className);
+    const containerClasses = hasExplicitDimensions ? className : `${currentConfig.container} ${className}`;
+
+    return (
+      <div
+        className={`relative flex items-center justify-center bg-gradient-to-br ${gradientClass} ${borderClass} ${shadowClass} shadow-md shrink-0 transition-transform duration-200 overflow-hidden ${containerClasses}`}
+        title={title}
+      >
+        {/* Specular 3D Gloss Highlight on Top Rim */}
+        <div className="absolute inset-x-0 top-0 h-2/5 bg-gradient-to-b from-white/40 to-transparent pointer-events-none rounded-t-xl" />
+
+        {/* Elevated Pristine Inner Stage: Crystal-clear contrast for 3D graphics */}
+        <div
+          className={`w-full h-full bg-white/95 backdrop-blur-xs flex items-center justify-center overflow-hidden shadow-xs ring-1 ring-black/5 ${currentConfig.inner} ${currentConfig.padding}`}
+        >
+          <IconComponent className="w-full h-full drop-shadow-xs transition-transform duration-200" />
+        </div>
+      </div>
+    );
+  };
 
   switch (categoryId) {
-    // 1. AC Technician & Gas Refill (3D Air Conditioner Unit)
+    // 1. AC Technician & Gas Refill
     case 'ac-technician':
     case 'ac':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-cyan-500 via-sky-600 to-blue-700 text-white shadow-md shadow-cyan-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="AC Technician (Air Conditioner 3D)"
-        >
-          <AcTechnician3DIcon />
-        </div>
+      return renderBadge(
+        'from-sky-400 via-blue-500 to-indigo-600',
+        'border border-sky-300/60',
+        'shadow-sky-500/25',
+        'AC Technician & Cooling (एसी रिपेयर)',
+        AcTechnician3DIcon
       );
 
-    // 2. Electrician & Wiring (3D Plug, Socket & High Voltage Spark)
+    // 2. Electrician & Wiring
     case 'electrician':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-amber-400 via-orange-500 to-amber-600 text-white shadow-md shadow-amber-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Electrician & Wiring 3D"
-        >
-          <Electrician3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-400 via-yellow-500 to-orange-500',
+        'border border-amber-300/60',
+        'shadow-amber-500/25',
+        'Electrician & Wiring (इलेक्ट्रीशियन)',
+        Electrician3DIcon
       );
 
-    // 3. CCTV & Security Installer (3D Security Surveillance Camera)
+    // 3. CCTV & Security Installer
     case 'cctv-security':
     case 'cctv':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-indigo-500 via-blue-600 to-purple-700 text-white shadow-md shadow-indigo-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="CCTV & Security Camera 3D"
-        >
-          <Cctv3DIcon />
-        </div>
+      return renderBadge(
+        'from-slate-700 via-slate-900 to-indigo-950',
+        'border border-slate-600/60',
+        'shadow-slate-800/30',
+        'CCTV & Security Camera (सीसीटीवी कैमरा)',
+        Cctv3DIcon
       );
 
-    // 4. Plumber & Water Motor (3D Chrome Tap Faucet & Droplet)
+    // 4. Plumber & Water Motor
     case 'plumber':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-blue-500 via-cyan-600 to-teal-700 text-white shadow-md shadow-blue-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Plumber & Water Motor 3D"
-        >
-          <Plumber3DIcon />
-        </div>
+      return renderBadge(
+        'from-cyan-400 via-blue-600 to-teal-700',
+        'border border-cyan-300/60',
+        'shadow-cyan-500/25',
+        'Plumber & Water Motor (प्लंबर एवं वाटर मोटर)',
+        Plumber3DIcon
       );
 
-    // 5. Home Appliance Repair (3D Washing Machine with Round Drum)
+    // 5. Home Appliance Repair
     case 'home-appliance':
     case 'appliance':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-slate-600 via-slate-700 to-slate-900 text-white shadow-md shadow-slate-700/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Home Appliance Washing Machine 3D"
-        >
-          <HomeAppliance3DIcon />
-        </div>
+      return renderBadge(
+        'from-indigo-500 via-purple-600 to-slate-900',
+        'border border-indigo-400/60',
+        'shadow-indigo-500/25',
+        'Home Appliance Repair (वाशिंग मशीन / फ्रिज)',
+        HomeAppliance3DIcon
       );
 
-    // 6. Taxi Driver & Cab Service (3D Yellow Taxi Cab)
+    // 6. Taxi Driver & Cab Service
     case 'taxi-cab-service':
     case 'taxi':
     case 'cab':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-yellow-400 via-amber-500 to-orange-600 text-white shadow-md shadow-amber-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Taxi Driver & Cab 3D"
-        >
-          <TaxiCab3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-400 via-yellow-400 to-amber-500',
+        'border border-amber-300/80',
+        'shadow-amber-500/30',
+        'Taxi Driver & Cab Service (टैक्सी एवं कैब)',
+        TaxiCab3DIcon
       );
 
-    // 7. Tile & Marble Layer (3D Polished Marble & Floor Tiles)
+    // 7. Tile & Marble Layer
     case 'tile-marble-layer':
     case 'tile':
     case 'marble':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-teal-500 via-emerald-600 to-teal-800 text-white shadow-md shadow-teal-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Tile & Marble 3D"
-        >
-          <TileMarble3DIcon />
-        </div>
+      return renderBadge(
+        'from-teal-500 via-emerald-600 to-slate-800',
+        'border border-teal-400/60',
+        'shadow-teal-500/25',
+        'Tile & Marble Layer (टाइल एवं मार्बल)',
+        TileMarble3DIcon
       );
 
-    // 8. Interior Designer (3D Luxury Lounge Sofa)
+    // 8. Interior Designer
     case 'interior-designer':
     case 'interior':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-rose-500 via-pink-600 to-purple-700 text-white shadow-md shadow-rose-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Interior Designer Sofa 3D"
-        >
-          <InteriorDesigner3DIcon />
-        </div>
+      return renderBadge(
+        'from-rose-500 via-pink-600 to-purple-800',
+        'border border-rose-400/60',
+        'shadow-rose-500/25',
+        'Interior Designer (इंटीरियर डिजाइनर)',
+        InteriorDesigner3DIcon
       );
 
-    // 9. Aluminum Fabricator (3D Sliding Aluminum Glass Window)
+    // 9. Aluminum Fabricator
     case 'aluminum-fabricator':
     case 'aluminum':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-slate-400 via-slate-600 to-zinc-700 text-white shadow-md shadow-slate-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Aluminum Fabricator Window 3D"
-        >
-          <AluminumFabricator3DIcon />
-        </div>
+      return renderBadge(
+        'from-slate-500 via-slate-600 to-zinc-800',
+        'border border-slate-400/60',
+        'shadow-slate-600/25',
+        'Aluminum Fabricator (एल्युमिनियम फैब्रिकेटर)',
+        AluminumFabricator3DIcon
       );
 
-    // 10. Glass Technician & Glazier (3D Glass Sheet & Suction Lifter)
+    // 10. Glass Technician
     case 'glass-technician':
     case 'glass':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-sky-400 via-cyan-500 to-blue-600 text-white shadow-md shadow-sky-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Glass Technician 3D"
-        >
-          <GlassTechnician3DIcon />
-        </div>
+      return renderBadge(
+        'from-sky-400 via-teal-400 to-blue-600',
+        'border border-sky-300/60',
+        'shadow-sky-500/25',
+        'Glass Technician (ग्लास एवं टफन्ड ग्लास)',
+        GlassTechnician3DIcon
       );
 
-    // 11. Painter & Wall Decor (3D Paint Roller with Dripping Color)
+    // 11. Painter
     case 'painter':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-purple-500 via-violet-600 to-indigo-700 text-white shadow-md shadow-purple-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Painter 3D"
-        >
-          <Painter3DIcon />
-        </div>
+      return renderBadge(
+        'from-fuchsia-500 via-purple-600 to-indigo-700',
+        'border border-purple-400/60',
+        'shadow-purple-500/25',
+        'Painter & Wall Decor (पेंटर)',
+        Painter3DIcon
       );
 
-    // 12. Mehndi Artist (3D Henna Cone & Mandala Art)
+    // 12. Mehndi Artist
     case 'mehndi-artist':
     case 'mehndi':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-emerald-500 via-green-600 to-emerald-800 text-white shadow-md shadow-emerald-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Mehndi Artist 3D"
-        >
-          <MehndiArtist3DIcon />
-        </div>
+      return renderBadge(
+        'from-emerald-500 via-green-600 to-teal-800',
+        'border border-emerald-400/60',
+        'shadow-emerald-600/25',
+        'Mehndi Artist (मेहंदी आर्टिस्ट)',
+        MehndiArtist3DIcon
       );
 
-    // 13. Makeup Artist & Beautician (3D Glamour Lipstick & Powder Brush)
+    // 13. Makeup Artist
     case 'makeup-artist':
     case 'makeup':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-pink-500 via-rose-500 to-red-600 text-white shadow-md shadow-pink-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Makeup Artist 3D"
-        >
-          <MakeupArtist3DIcon />
-        </div>
+      return renderBadge(
+        'from-pink-400 via-rose-500 to-red-600',
+        'border border-pink-300/60',
+        'shadow-pink-500/25',
+        'Makeup Artist & Beautician (मेकअप आर्टिस्ट)',
+        MakeupArtist3DIcon
       );
 
-    // 14. Marriage Hall & Event Decorator (3D Celebration Popper & Confetti)
+    // 14. Marriage Hall & Event Decorator
     case 'event-decorator':
     case 'decorator':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-amber-500 via-orange-500 to-pink-600 text-white shadow-md shadow-orange-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Event Decorator 3D"
-        >
-          <EventDecorator3DIcon />
-        </div>
+      return renderBadge(
+        'from-orange-400 via-rose-500 to-purple-600',
+        'border border-orange-300/60',
+        'shadow-orange-500/25',
+        'Event Decorator & Marriage Hall (इवेंट डेकोरेटर)',
+        EventDecorator3DIcon
       );
 
-    // 15. Wallpaper & Panel Installer (3D Textured Wallpaper Roll)
+    // 15. Wallpaper & Panel Installer
     case 'wallpaper-panel-installer':
     case 'wallpaper':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-yellow-600 via-amber-600 to-orange-700 text-white shadow-md shadow-amber-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Wallpaper & Panel 3D"
-        >
-          <WallpaperPanel3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-500 via-yellow-600 to-stone-800',
+        'border border-amber-400/60',
+        'shadow-amber-500/25',
+        'Wallpaper & Panel Installer (वॉलपेपर एवं पैनल)',
+        WallpaperPanel3DIcon
       );
 
-    // 16. False Ceiling Contractor (3D POP Ceiling with Warm LED Cove Light)
+    // 16. False Ceiling Contractor
     case 'false-ceiling-contractor':
     case 'ceiling':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-slate-500 via-slate-600 to-zinc-800 text-white shadow-md shadow-slate-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="False Ceiling 3D"
-        >
-          <FalseCeiling3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-500 via-slate-800 to-zinc-950',
+        'border border-amber-400/60',
+        'shadow-slate-700/25',
+        'False Ceiling Contractor (फॉल्स सीलिंग)',
+        FalseCeiling3DIcon
       );
 
-    // 17. Key Lock Maker (3D Brass Master Key & Heavy Padlock)
+    // 17. Key Lock Maker
     case 'key-lock-maker':
     case 'locksmith':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-amber-500 via-yellow-600 to-amber-700 text-white shadow-md shadow-amber-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Key & Lock Maker 3D"
-        >
-          <KeyLockMaker3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-400 via-yellow-500 to-amber-700',
+        'border border-amber-300/60',
+        'shadow-amber-500/25',
+        'Key Lock Maker (चाबी एवं ताला बनाने वाले)',
+        KeyLockMaker3DIcon
       );
 
-    // 18. Inverter & Battery Mechanic (3D Tubular Inverter Battery)
+    // 18. Inverter & Battery Mechanic
     case 'inverter-battery-mechanic':
     case 'battery':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-red-500 via-orange-600 to-slate-800 text-white shadow-md shadow-red-500/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Inverter & Battery 3D"
-        >
-          <InverterBattery3DIcon />
-        </div>
+      return renderBadge(
+        'from-red-500 via-orange-600 to-slate-900',
+        'border border-red-400/60',
+        'shadow-red-600/25',
+        'Inverter & Battery Mechanic (इन्वर्टर एवं बैटरी)',
+        InverterBattery3DIcon
       );
 
-    // 19. Carpenter & Woodwork (3D Timber Wood Lumber, Saw & Hammer)
+    // 19. Carpenter & Woodwork
     case 'carpenter-woodwork':
     case 'carpenter':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-amber-700 via-amber-800 to-amber-950 text-white shadow-md shadow-amber-800/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Carpenter & Woodwork 3D"
-        >
-          <Carpenter3DIcon />
-        </div>
+      return renderBadge(
+        'from-amber-700 via-amber-800 to-stone-900',
+        'border border-amber-600/60',
+        'shadow-amber-800/25',
+        'Carpenter & Woodwork (बढ़ई / फर्नीचर)',
+        Carpenter3DIcon
       );
 
-    // 20. Doorstep Bike Repair (3D Motorbike Motorcycle with Mechanic Wrench)
+    // 20. Doorstep Bike Repair
     case 'doorstep-bike-repair':
     case 'bike':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-red-600 via-rose-600 to-slate-900 text-white shadow-md shadow-red-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Doorstep Bike Repair 3D"
-        >
-          <BikeRepair3DIcon />
-        </div>
+      return renderBadge(
+        'from-red-500 via-rose-600 to-zinc-900',
+        'border border-red-400/60',
+        'shadow-red-500/25',
+        'Doorstep Bike Repair (डोरस्टेप बाइक रिपेयर)',
+        BikeRepair3DIcon
       );
 
-    // 21. Home Tuition / Personal Tutor (3D Books & Graduation Cap)
+    // 21. Home Tuition / Personal Tutor
     case 'home-tuition':
     case 'tuition':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-800 text-white shadow-md shadow-indigo-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Home Tuition 3D"
-        >
-          <HomeTuition3DIcon />
-        </div>
+      return renderBadge(
+        'from-blue-500 via-indigo-600 to-slate-900',
+        'border border-blue-400/60',
+        'shadow-blue-500/25',
+        'Home Tuition / Personal Tutor (होम ट्यूशन)',
+        HomeTuition3DIcon
       );
 
-    // 22. Goods Transport / Pickup (Chota Hathi / Tata Ace Mini Cargo Truck)
+    // 22. Goods Transport / Pickup (Chota Hathi)
     case 'goods-transport':
     case 'transport':
     case 'chota-hathi':
-      return (
-        <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-teal-600 via-cyan-700 to-sky-800 text-white shadow-md shadow-teal-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
-          title="Goods Transport Chota Hathi 3D"
-        >
-          <GoodsTransport3DIcon />
-        </div>
+      return renderBadge(
+        'from-cyan-500 via-teal-600 to-blue-900',
+        'border border-cyan-400/60',
+        'shadow-cyan-600/25',
+        'Goods Transport / Pickup Chota Hathi (गुड्स ट्रांसपोर्ट)',
+        GoodsTransport3DIcon
+      );
+
+    // 23. Cleaner / Maid
+    case 'cleaner-maid':
+    case 'cleaner':
+    case 'maid':
+      return renderBadge(
+        'from-teal-400 via-cyan-500 to-blue-600',
+        'border border-teal-300/60',
+        'shadow-teal-500/25',
+        'Cleaner / Maid (सफाई कर्मचारी / मेड)',
+        CleanerMaid3DIcon
+      );
+
+    // 24. Babysitter / Nurse
+    case 'babysitter-nurse':
+    case 'babysitter':
+    case 'nurse':
+      return renderBadge(
+        'from-rose-400 via-pink-500 to-rose-600',
+        'border border-rose-300/60',
+        'shadow-rose-500/25',
+        'Babysitter / Nurse Caretaker (बेबीसिटर / नर्स)',
+        BabysitterNurse3DIcon
+      );
+
+    // 25. Packers & Movers Helper
+    case 'packers-movers-helper':
+    case 'packers-movers':
+    case 'movers':
+    case 'packers':
+      return renderBadge(
+        'from-amber-600 via-yellow-700 to-stone-800',
+        'border border-amber-500/60',
+        'shadow-amber-600/25',
+        'Packers & Movers Helper (पैकर्स एवं मूवर्स हेल्पर)',
+        PackersMoversHelper3DIcon
       );
 
     default:
       return (
         <div
-          className={`relative flex items-center justify-center bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-600/25 border border-white/20 shrink-0 overflow-hidden ${currentSizeClass} ${className}`}
+          className={`relative flex items-center justify-center bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md border border-blue-400/50 shrink-0 overflow-hidden ${currentConfig.container} ${className}`}
         >
-          <Wrench className="w-full h-full p-1 text-white" />
+          <div
+            className={`w-full h-full bg-white/95 backdrop-blur-xs flex items-center justify-center overflow-hidden shadow-xs ring-1 ring-black/5 ${currentConfig.inner} ${currentConfig.padding}`}
+          >
+            <Wrench className="w-full h-full p-1 text-blue-600" />
+          </div>
         </div>
       );
   }

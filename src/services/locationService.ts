@@ -419,18 +419,25 @@ export function calculateDistanceKm(
 // Reverse geocode GPS coordinates to address (Zero external API cost)
 export async function reverseGeocodeCoordinates(
   latitude: number,
-  longitude: number
+  longitude: number,
+  accuracyMeters?: number
 ): Promise<UserLocation> {
-  // 1. Primary zero-cost reverse geocoding via OpenStreetMap Nominatim
+  // 1. Primary reverse geocoding via OpenStreetMap Nominatim with strict timeout abort controller
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
     const response = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`,
       {
+        signal: controller.signal,
         headers: {
           'Accept-Language': 'en',
         },
       }
     );
+    clearTimeout(timeoutId);
+
     if (response.ok) {
       const data = await response.json();
       const address = data.address || {};
@@ -439,10 +446,12 @@ export async function reverseGeocodeCoordinates(
         address.town ||
         address.village ||
         address.municipality ||
+        address.suburb ||
         address.city_district ||
         address.state_district ||
         address.county ||
-        'Current City';
+        '';
+
       const area =
         address.suburb ||
         address.neighbourhood ||
@@ -450,27 +459,34 @@ export async function reverseGeocodeCoordinates(
         address.commercial ||
         address.industrial ||
         address.road ||
+        city ||
         'Local Area';
+
       const state = address.state || 'India';
       const postcode = address.postcode ? ` - ${address.postcode}` : '';
       const road = address.road ? `${address.road}, ` : '';
 
-      return {
-        latitude,
-        longitude,
-        city,
-        area,
-        state,
-        address: data.display_name
-          ? data.display_name.split(',').slice(0, 4).join(', ') + postcode
-          : `${road}${area}, ${city}, ${state}${postcode}`,
-      };
+      // If city was extracted, use it
+      if (city) {
+        return {
+          latitude,
+          longitude,
+          city,
+          area,
+          state,
+          address: data.display_name
+            ? data.display_name.split(',').slice(0, 4).join(', ') + postcode
+            : `${road}${area}, ${city}, ${state}${postcode}`,
+          isGpsLocked: true,
+          accuracyMeters,
+        };
+      }
     }
-  } catch {
-    // In case reverse geocoding fails or is rate limited, use nearest Indian district approximation
+  } catch (e) {
+    // Nominatim aborted, rate limited, or CORS issue; fallback to Indian district database
   }
 
-  // Find closest district among all 700+ Indian districts for pinpoint local accuracy
+  // 2. High-precision nearest Indian District fallback from 700+ registered districts
   let closestDist = ALL_INDIAN_DISTRICTS[0];
   let minDist = calculateDistanceKm(latitude, longitude, closestDist.latitude, closestDist.longitude);
   for (const dist of ALL_INDIAN_DISTRICTS) {
@@ -483,9 +499,11 @@ export async function reverseGeocodeCoordinates(
 
   const cleanDistName = closestDist.name.replace(/\s*\(.*?\)\s*/g, '').trim();
   const cleanArea =
-    minDist < 15
-      ? `${cleanDistName} Hub`
-      : `Doorstep Pin (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`;
+    minDist < 10
+      ? `${cleanDistName} Central`
+      : minDist < 25
+      ? `${cleanDistName} Vicinity`
+      : `Pin (${latitude.toFixed(3)}°N, ${longitude.toFixed(3)}°E)`;
 
   return {
     latitude,
@@ -494,45 +512,128 @@ export async function reverseGeocodeCoordinates(
     area: cleanArea,
     state: closestDist.state,
     address: `${cleanArea}, ${cleanDistName}, ${closestDist.state}, India`,
+    isGpsLocked: true,
+    accuracyMeters,
   };
 }
 
-// Real GPS location tracker using Browser Geolocation
-export async function getCurrentGPSLocation(): Promise<UserLocation> {
-  return new Promise((resolve) => {
+/**
+ * Check browser geolocation permission status safely
+ */
+export async function checkGPSPermission(): Promise<'granted' | 'prompt' | 'denied' | 'unsupported'> {
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    return 'unsupported';
+  }
+  if (navigator.permissions && navigator.permissions.query) {
+    try {
+      const permission = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+      return permission.state;
+    } catch {
+      return 'prompt';
+    }
+  }
+  return 'prompt';
+}
+
+/**
+ * Helper to get browser position with customizable accuracy and timeout
+ */
+function getBrowserPosition(options: PositionOptions): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
     if (!navigator.geolocation) {
-      resolve({
-        ...DEFAULT_USER_LOCATION,
-        address: DEFAULT_USER_LOCATION.address,
-      });
+      reject(new Error('Geolocation is not supported by your browser'));
       return;
     }
-
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        try {
-          const { latitude, longitude } = position.coords;
-          const result = await reverseGeocodeCoordinates(latitude, longitude);
-          resolve(result);
-        } catch {
-          resolve(DEFAULT_USER_LOCATION);
-        }
-      },
-      (error) => {
-        // Fallback gracefully to default location if permission denied in iframe
-        console.warn('GPS Geolocation error/fallback:', error.message);
-        resolve({
-          ...DEFAULT_USER_LOCATION,
-          address: DEFAULT_USER_LOCATION.address,
-        });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000,
-      }
-    );
+    navigator.geolocation.getCurrentPosition(resolve, reject, options);
   });
+}
+
+/**
+ * Fallback to IP-based Geolocation when hardware GPS is blocked or unavailable
+ */
+async function getIPBasedLocation(): Promise<UserLocation | null> {
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 4000);
+
+    const response = await fetch('https://ipwho.is/', {
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success && typeof data.latitude === 'number' && typeof data.longitude === 'number') {
+        const city = data.city || data.region || 'Local Hub';
+        const state = data.region || 'India';
+        const country = data.country || 'India';
+
+        return {
+          latitude: data.latitude,
+          longitude: data.longitude,
+          city,
+          area: `${city} Central`,
+          state,
+          address: `${city}, ${state}, ${country}`,
+          isGpsLocked: true,
+          accuracyMeters: 5000,
+        };
+      }
+    }
+  } catch (err) {
+    // IP fallback failed silently
+  }
+  return null;
+}
+
+/**
+ * Real GPS location tracker using multi-tier robust fallback:
+ * 1. High-accuracy GPS (satellite/GNSS) with fast 5s timeout
+ * 2. Standard accuracy network triangulation (WiFi/Cell towers) with 6s timeout
+ * 3. IP-based location fallback (works when browser permission is blocked)
+ * 4. Stored user location / Nearest Indian district
+ */
+export async function getCurrentGPSLocation(): Promise<UserLocation> {
+  // Step 1: Try High Accuracy GPS (Satellite/GNSS lock)
+  try {
+    const pos = await getBrowserPosition({
+      enableHighAccuracy: true,
+      timeout: 5000,
+      maximumAge: 30000,
+    });
+    const { latitude, longitude, accuracy } = pos.coords;
+    const result = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
+    return { ...result, isGpsLocked: true };
+  } catch (firstErr: any) {
+    console.info('High accuracy GPS timed out or unavailable, trying network positioning...', firstErr?.message);
+  }
+
+  // Step 2: Try Low Accuracy (WiFi Hotspots & Cellular Network Triangulation - Very fast & works indoors)
+  try {
+    const pos = await getBrowserPosition({
+      enableHighAccuracy: false,
+      timeout: 6000,
+      maximumAge: 60000,
+    });
+    const { latitude, longitude, accuracy } = pos.coords;
+    const result = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
+    return { ...result, isGpsLocked: true };
+  } catch (secondErr: any) {
+    console.warn('Network browser geolocation failed:', secondErr?.message);
+  }
+
+  // Step 3: Try IP Geolocation (Detect city & state without requiring browser prompt)
+  const ipLoc = await getIPBasedLocation();
+  if (ipLoc) {
+    return ipLoc;
+  }
+
+  // Step 4: Fallback gracefully to default location
+  return {
+    ...DEFAULT_USER_LOCATION,
+    address: DEFAULT_USER_LOCATION.address,
+    isGpsLocked: false,
+  };
 }
 
 // Re-export all district mappings, interfaces, and helpers

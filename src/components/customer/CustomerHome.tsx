@@ -16,6 +16,9 @@ import {
   Calendar,
   Lock,
   Phone,
+  Minus,
+  Plus,
+  AlertCircle,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, UserProfile } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -62,6 +65,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
+  const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
 
   const currentLocation = customerLocation || currentUser?.location || DEFAULT_USER_LOCATION;
@@ -86,13 +90,21 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const handleDetectGPS = async () => {
     setIsDetectingGps(true);
     setGpsSuccess(false);
+    setGpsErrorMsg(null);
     try {
       const loc = await getCurrentGPSLocation();
       onUpdateLocation(loc);
-      setGpsSuccess(true);
-      setTimeout(() => setGpsSuccess(false), 4000);
-    } catch (err) {
-      console.error(err);
+      if (loc.isGpsLocked) {
+        setGpsSuccess(true);
+        setTimeout(() => setGpsSuccess(false), 5000);
+      } else {
+        setGpsErrorMsg('Live GPS is blocked or unavailable in this browser. Showing nearest city hub.');
+        setTimeout(() => setGpsErrorMsg(null), 6000);
+      }
+    } catch (err: any) {
+      console.error('GPS detection error:', err);
+      setGpsErrorMsg('Could not auto-lock live GPS. Please tap to choose your location manually.');
+      setTimeout(() => setGpsErrorMsg(null), 6000);
     } finally {
       setIsDetectingGps(false);
     }
@@ -258,9 +270,15 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                     <span className="truncate max-w-[130px] sm:max-w-[200px] text-xs font-bold text-white">
                       {currentLocation.area ? `${currentLocation.area}, ${currentLocation.city}` : currentLocation.city}
                     </span>
-                    <span className="text-[9px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-400/30 uppercase shrink-0">
-                      Auto GPS
-                    </span>
+                    {currentLocation.isGpsLocked ? (
+                      <span className="text-[9px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-400/30 uppercase shrink-0 flex items-center gap-0.5">
+                        <CheckCircle2 size={9} /> GPS Live
+                      </span>
+                    ) : (
+                      <span className="text-[9px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-bold border border-blue-400/30 uppercase shrink-0">
+                        City Pin
+                      </span>
+                    )}
                   </div>
                   <span className="text-[10px] text-blue-200/80 font-mono block truncate">
                     {currentLocation.address || `${currentLocation.latitude.toFixed(4)}°, ${currentLocation.longitude.toFixed(4)}°`}
@@ -295,6 +313,22 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             </div>
           )}
 
+          {gpsErrorMsg && (
+            <div className="text-xs text-amber-200 font-semibold flex items-center justify-between gap-2 bg-amber-950/80 border border-amber-500/50 px-3 py-2 rounded-xl animate-in fade-in shadow-sm">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <AlertCircle size={14} className="text-amber-400 shrink-0" />
+                <span className="truncate">{gpsErrorMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowLocationModal(true)}
+                className="text-[11px] font-bold underline text-white hover:text-amber-200 shrink-0 cursor-pointer"
+              >
+                Choose City
+              </button>
+            </div>
+          )}
+
           {/* Pan-India 28 States Bar */}
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/15 text-[11px]">
             <div className="flex items-center gap-1.5 text-blue-100">
@@ -314,12 +348,16 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
       </div>
 
-      {/* 22 OFFICIAL SERVICE CATEGORIES CAROUSEL/GRID */}
+      {/* OFFICIAL SERVICE CATEGORIES CAROUSEL/GRID */}
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold font-display text-slate-900">Explore 22 Service Categories</h2>
-            <p className="text-xs text-slate-500">Pick a trade to browse verified specialists in your coverage area (22 Verified Trades)</p>
+            <h2 className="text-base font-bold font-display text-slate-900">
+              Explore {SERVICE_CATEGORIES.length} Service Categories
+            </h2>
+            <p className="text-xs text-slate-500">
+              Pick a trade to browse verified specialists in your coverage area ({SERVICE_CATEGORIES.length} Verified Trades)
+            </p>
           </div>
           {selectedCategory !== 'all' && (
             <button
@@ -423,33 +461,63 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl px-3 py-1.5 shadow-2xs">
               <div className="flex items-center gap-1.5">
                 <span className="text-[11px] font-bold text-slate-700">Radius:</span>
-                <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-lg border border-blue-200">
-                  {maxDistanceKm} km
-                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setMaxDistanceKm((prev) => Math.max(1, prev - 1))}
+                    disabled={maxDistanceKm <= 1}
+                    className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
+                    title="Decrease 1 km"
+                  >
+                    <Minus size={11} />
+                  </button>
+                  <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-lg border border-blue-200 min-w-[44px] text-center">
+                    {maxDistanceKm} km
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setMaxDistanceKm((prev) => Math.min(20, prev + 1))}
+                    disabled={maxDistanceKm >= 20}
+                    className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
+                    title="Increase 1 km"
+                  >
+                    <Plus size={11} />
+                  </button>
+                </div>
               </div>
 
-              {/* Smooth Custom Slider (1 - 20 km) */}
+              {/* Smooth Custom Slider (1 - 20 km) with onInput and dynamic fill */}
               <input
                 type="range"
-                min="1"
-                max="20"
-                step="1"
+                min={1}
+                max={20}
+                step={1}
                 value={maxDistanceKm}
-                onChange={(e) => setMaxDistanceKm(Number(e.target.value))}
-                className="w-20 sm:w-28 h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                onInput={(e) => {
+                  const val = parseInt((e.target as HTMLInputElement).value, 10);
+                  if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
+                }}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value, 10);
+                  if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
+                }}
+                className="w-20 sm:w-28 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 touch-none"
+                style={{
+                  background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 100%)`,
+                }}
                 title={`Coverage Radius: ${maxDistanceKm} km`}
               />
 
               {/* Quick Preset Chips */}
               <div className="hidden sm:flex items-center gap-1">
-                {[1, 5, 10, 15, 20].map((step) => (
+                {[1, 3, 5, 10, 15, 20].map((step) => (
                   <button
                     key={step}
                     type="button"
                     onClick={() => setMaxDistanceKm(step)}
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all ${
+                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
                       maxDistanceKm === step
-                        ? 'bg-blue-600 text-white shadow-2xs'
+                        ? 'bg-blue-600 text-white shadow-2xs scale-105'
                         : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
                     }`}
                   >

@@ -102,19 +102,14 @@ export default function App() {
     syncState();
     const unsubStorage = storageService.subscribe(syncState);
 
-    // Check if initial name input flow is needed (first visit or name not entered yet)
-    const user = storageService.getCurrentUser();
-    const storedCustomName = localStorage.getItem('needfix_customer_custom_name');
-    if (
-      !storedCustomName &&
-      (!user ||
-        !user.name ||
-        user.name === 'NeedFix Customer' ||
-        user.name === 'Nadeem' ||
-        user.name.includes('Super Admin'))
-    ) {
-      setShowAuthModal(true);
-    }
+    // Show Important Notice modal after 5 seconds of entering (if not already agreed)
+    const noticeTimer = setTimeout(() => {
+      const activeUser = storageService.getCurrentUser();
+      const hasAgreed = storageService.hasAgreedImportantNotice(activeUser?.id, activeUser?.email);
+      if (!hasAgreed) {
+        setShowImportantNoticeModal(true);
+      }
+    }, 5000);
 
     // Load live approved technicians from Supabase database
     supabaseService.getApprovedTechnicians().then((liveTechs) => {
@@ -180,6 +175,7 @@ export default function App() {
     });
 
     return () => {
+      clearTimeout(noticeTimer);
       unsubStorage();
       subscription.unsubscribe();
     };
@@ -199,7 +195,7 @@ export default function App() {
   };
 
   // Auth completion handler
-  const handleAuthSuccess = (user: UserProfile, isNewUser: boolean) => {
+  const handleAuthSuccess = (user: UserProfile, _isNewUser: boolean) => {
     setShowAuthModal(false);
     setCurrentUser(user);
 
@@ -207,8 +203,6 @@ export default function App() {
 
     if (!hasAgreed) {
       setShowImportantNoticeModal(true);
-    } else if (isNewUser || !user.name) {
-      setShowOnboardingModal(true);
     } else if (user.role === 'technician') {
       setActiveView('technician_dashboard');
     } else if (user.role === 'admin') {
@@ -415,6 +409,7 @@ export default function App() {
       <ImportantNoticeModal
         isOpen={showImportantNoticeModal}
         onAgree={handleAgreeImportantNotice}
+        onClose={() => setShowImportantNoticeModal(false)}
         userName={currentUser?.name}
       />
 

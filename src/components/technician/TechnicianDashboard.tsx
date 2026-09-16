@@ -18,6 +18,7 @@ import {
   Power,
   RefreshCw,
   Plus,
+  Minus,
   Trash2,
   Camera,
   FolderOpen,
@@ -55,7 +56,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   const [editHourlyRate, setEditHourlyRate] = useState<number | ''>(initialTech.hourlyRate || '');
   const [editRateCardNotes, setEditRateCardNotes] = useState(initialTech.rateCardNotes || '');
   const [editRadius, setEditRadius] = useState<number>(
-    [5, 10, 15, 20].includes(initialTech.coverageRadiusKm) ? initialTech.coverageRadiusKm : 10
+    initialTech.coverageRadiusKm && initialTech.coverageRadiusKm >= 1 ? initialTech.coverageRadiusKm : 10
   );
   const [editCoverageArea, setEditCoverageArea] = useState(initialTech.coverageAreaText);
   const [editWorkingHours, setEditWorkingHours] = useState(initialTech.workingHours);
@@ -209,7 +210,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       priceUnit: editPriceUnit.trim() || 'Visiting Fee',
       hourlyRate: editHourlyRate ? Number(editHourlyRate) : undefined,
       rateCardNotes: editRateCardNotes.trim() || undefined,
-      coverageRadiusKm: Math.min(20, Math.max(5, Number(editRadius))),
+      coverageRadiusKm: Math.min(20, Math.max(1, Number(editRadius))),
       coverageAreaText: editCoverageArea.trim(),
       workingHours: editWorkingHours.trim(),
       servicesOffered: editServices,
@@ -590,50 +591,92 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
               {/* Coverage Radius & Working Hours */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-2.5">
+                <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 space-y-3">
                   <div className="flex items-center justify-between text-xs">
-                    <label className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <span>🎯 Service Coverage Radius</span>
-                      <span className="text-[10px] text-slate-500 font-normal">(1 km - 20 km)</span>
-                    </label>
-                    <span className="font-extrabold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-lg border border-blue-200 text-xs">
-                      {editRadius} km
-                    </span>
+                    <div>
+                      <label className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <span>🎯 Service Coverage Radius</span>
+                      </label>
+                      <p className="text-[10px] text-slate-500 font-normal">
+                        Select exact service distance (1 km to 20 km)
+                      </p>
+                    </div>
+
+                    {/* Interactive Stepper & Value Badge */}
+                    <div className="flex items-center gap-1 bg-white border border-slate-200 p-1 rounded-xl shadow-2xs">
+                      <button
+                        type="button"
+                        onClick={() => setEditRadius((prev) => Math.max(1, prev - 1))}
+                        disabled={editRadius <= 1}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold transition-all cursor-pointer"
+                        title="Decrease 1 km"
+                      >
+                        <Minus size={14} />
+                      </button>
+
+                      <div className="flex items-center justify-center min-w-[58px] px-1 text-center font-extrabold text-blue-600 text-sm">
+                        <span>{editRadius}</span>
+                        <span className="text-[11px] font-semibold text-slate-500 ml-0.5">km</span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setEditRadius((prev) => Math.min(20, prev + 1))}
+                        disabled={editRadius >= 20}
+                        className="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 hover:bg-slate-200 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 font-bold transition-all cursor-pointer"
+                        title="Increase 1 km"
+                      >
+                        <Plus size={14} />
+                      </button>
+                    </div>
                   </div>
 
-                  {/* Smooth Range Slider (1 to 20 km, step 1) */}
-                  <input
-                    type="range"
-                    min={1}
-                    max={20}
-                    step={1}
-                    value={editRadius}
-                    onChange={(e) => setEditRadius(Number(e.target.value))}
-                    className="w-full accent-blue-600 cursor-pointer h-2 bg-slate-200 rounded-lg"
-                  />
+                  {/* Smooth Real-Time Range Slider (1 to 20 km with dynamic fill & touch-none) */}
+                  <div className="relative pt-1">
+                    <input
+                      type="range"
+                      min={1}
+                      max={20}
+                      step={1}
+                      value={editRadius}
+                      onInput={(e) => {
+                        const val = parseInt((e.target as HTMLInputElement).value, 10);
+                        if (!isNaN(val)) setEditRadius(Math.min(20, Math.max(1, val)));
+                      }}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        if (!isNaN(val)) setEditRadius(Math.min(20, Math.max(1, val)));
+                      }}
+                      className="w-full accent-blue-600 cursor-pointer h-2.5 rounded-lg appearance-none touch-none"
+                      style={{
+                        background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((editRadius - 1) / 19) * 100}%, #e2e8f0 ${((editRadius - 1) / 19) * 100}%, #e2e8f0 100%)`,
+                      }}
+                    />
+                  </div>
 
-                  {/* Quick Preset Buttons */}
-                  <div className="flex items-center justify-between gap-1.5">
-                    {[1, 3, 5, 10, 15, 20].map((step) => (
+                  {/* Quick One-Tap Preset Buttons */}
+                  <div className="flex items-center justify-between gap-1 sm:gap-1.5">
+                    {[1, 2, 3, 5, 8, 10, 15, 20].map((step) => (
                       <button
                         key={step}
                         type="button"
                         onClick={() => setEditRadius(step)}
-                        className={`flex-1 py-1 px-1.5 rounded-lg text-xs font-bold transition-all border ${
+                        className={`flex-1 py-1.5 px-1 rounded-lg text-[11px] font-bold transition-all border cursor-pointer ${
                           editRadius === step
-                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                            ? 'bg-blue-600 text-white border-blue-600 shadow-xs scale-105 z-10'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100'
                         }`}
                       >
-                        {step} km
+                        {step}k
                       </button>
                     ))}
                   </div>
 
-                  <div className="flex justify-between text-[10px] text-slate-400 font-medium pt-0.5">
-                    <span>1 km (Neighborhood)</span>
+                  <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+                    <span>1 km (Local)</span>
+                    <span>5 km (City Zone)</span>
                     <span>10 km (Standard)</span>
-                    <span>20 km (Max Radius)</span>
+                    <span>20 km (Max)</span>
                   </div>
                 </div>
 

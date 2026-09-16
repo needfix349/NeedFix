@@ -451,23 +451,33 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
           {activeTab === 'profile' && (
             <div className="space-y-4">
               {/* User Identity Card */}
-              <div className="bg-white rounded-2xl border border-slate-200 p-4 flex items-center gap-3">
-                <img
-                  src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
-                  alt={currentUser.name}
-                  className="w-14 h-14 rounded-2xl object-cover border border-slate-200"
-                />
-                <div className="flex-1">
-                  <h4 className="text-sm font-bold text-slate-900">{currentUser.name}</h4>
-                  <span className="inline-block mt-1 text-[10px] uppercase font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
-                    {currentUser.role} Account
-                  </span>
+              <div className="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-xs">
+                <div className="flex items-center gap-3">
+                  <img
+                    src={currentUser.avatarUrl || 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=100'}
+                    alt={currentUser.name}
+                    className="w-13 h-13 rounded-2xl object-cover border border-slate-200"
+                  />
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-sm font-bold text-slate-900 truncate">{currentUser.name}</h4>
+                    <span className="inline-block mt-0.5 text-[10px] uppercase font-bold bg-blue-50 text-blue-700 px-2 py-0.5 rounded-md">
+                      {currentUser.role} Account
+                    </span>
+                    {currentUser.location && (
+                      <p className="text-[10px] text-slate-500 truncate mt-0.5">
+                        📍 {currentUser.location.area}, {currentUser.location.city}
+                      </p>
+                    )}
+                  </div>
                 </div>
+
                 <button
+                  type="button"
                   onClick={onOpenAuth}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-800"
+                  className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-blue-200/60"
                 >
-                  Switch
+                  <User size={14} />
+                  <span>Edit Name / Profile (नाम बदलें / दर्ज करें)</span>
                 </button>
               </div>
 
@@ -479,7 +489,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                 </div>
                 <h4 className="text-sm font-bold">Become a Service Provider</h4>
                 <p className="text-xs text-amber-100">
-                  Register your business in any of the 20 categories and receive direct customer leads in your city.
+                  Register your business in any of the {SERVICE_CATEGORIES.length} categories and receive direct customer leads in your city.
                 </p>
                 <button
                   onClick={onOpenTechnicianRegistration}
