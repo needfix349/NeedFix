@@ -121,7 +121,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       .filter((tech) => {
         if (showOnlyFavorites && !favorites.includes(tech.id)) return false;
         
-        // Multi-category matching
+        // Multi-category matching: show technicians for the selected service
         if (selectedCategory !== 'all') {
           const matchesCategory =
             tech.categoryId === selectedCategory ||
@@ -133,24 +133,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         if (onlineOnly && !tech.isOnline) return false;
         if (minRating > 0 && tech.rating < minRating) return false;
 
-        // Native GPS Proximity calculation using Haversine formula (Zero API cost)
-        const dist = calculateDistanceKm(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          tech.location.latitude,
-          tech.location.longitude
-        );
-
-        // Hard filter: filter out any technician located beyond 20 km radius
-        if (dist > 20) {
-          return false;
-        }
-
-        // Apply radius filter if customer selected a narrower radius (3, 5, 10, 15 km)
-        if (maxDistanceKm < 20 && dist > maxDistanceKm) {
-          return false;
-        }
-
         // Search text matching
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -158,6 +140,11 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           const matchCompany = tech.companyName.toLowerCase().includes(q);
           const matchCategory =
             tech.categoryName.toLowerCase().includes(q) ||
+            (tech.categoryIds &&
+              tech.categoryIds.some((cid) => {
+                const c = SERVICE_CATEGORIES.find((sc) => sc.id === cid);
+                return c?.name.toLowerCase().includes(q);
+              })) ||
             (tech.categoryNames &&
               tech.categoryNames.some((catName) => catName.toLowerCase().includes(q)));
           const matchArea = tech.coverageAreaText?.toLowerCase().includes(q);
@@ -169,6 +156,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         return true;
       })
       .sort((a, b) => {
+        // Native GPS Proximity calculation: closest technician to customer's GPS is FIRST!
         const distA = calculateDistanceKm(
           currentLocation.latitude,
           currentLocation.longitude,
@@ -182,15 +170,11 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           b.location.longitude
         );
 
-        if (sortBy === 'distance') {
-          // Prioritize technicians whose set coverage range encompasses the customer's location
-          const aInRange = distA <= (a.coverageRadiusKm || 15);
-          const bInRange = distB <= (b.coverageRadiusKm || 15);
-          if (aInRange && !bInRange) return -1;
-          if (!aInRange && bInRange) return 1;
-          return distA - distB;
+        if (sortBy === 'rating') {
+          return b.rating - a.rating;
         }
-        if (sortBy === 'rating') return b.rating - a.rating;
+
+        // Proximity priority: closest to current GPS comes first
         return distA - distB;
       });
   }, [
@@ -200,7 +184,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     verifiedOnly,
     onlineOnly,
     minRating,
-    maxDistanceKm,
     sortBy,
     showOnlyFavorites,
     favorites,

@@ -23,6 +23,7 @@ const KEYS = {
   CURRENT_USER: 'needfix_v9_current_user',
   USERS: 'needfix_v9_users',
   TECHNICIANS: 'needfix_v9_technicians',
+  PENDING_APPLICATIONS: 'needfix_v9_pending_applications',
   LEADS: 'needfix_v9_leads',
   REVIEWS: 'needfix_v9_reviews',
   AUDIT_LOGS: 'needfix_v9_audit_logs',
@@ -300,14 +301,71 @@ class StorageService {
   // --- TECHNICIANS ---
   getTechnicians(): TechnicianProfile[] {
     try {
-      return JSON.parse(localStorage.getItem(KEYS.TECHNICIANS) || '[]');
+      const primary: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.TECHNICIANS) || '[]');
+      const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
+
+      const map = new Map<string, TechnicianProfile>();
+      // First populate with primary
+      for (const t of primary) {
+        map.set(t.id, t);
+      }
+      // Merge with pending (pending must never be lost)
+      for (const p of pending) {
+        if (!map.has(p.id)) {
+          map.set(p.id, p);
+        } else {
+          const curr = map.get(p.id)!;
+          if (curr.status !== 'approved' && p.status === 'pending') {
+            map.set(p.id, { ...curr, status: 'pending', isApproved: false });
+          }
+        }
+      }
+
+      const merged = Array.from(map.values());
+
+      // Ensure every technician has a valid unique technicianCode (e.g. NF-TECH-1001)
+      let counter = 1001;
+      for (const tech of merged) {
+        if (!tech.technicianCode) {
+          tech.technicianCode = `NF-TECH-${counter++}`;
+        }
+      }
+      return merged;
     } catch {
       return [];
     }
   }
 
+  // Get all pending applications directly
+  getPendingTechnicians(): TechnicianProfile[] {
+    return this.getTechnicians().filter((t) => t.status === 'pending');
+  }
+
+  getPendingCount(): number {
+    return this.getPendingTechnicians().length;
+  }
+
   setTechnicians(technicians: TechnicianProfile[]): void {
-    localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+    const current = this.getTechnicians();
+    const incomingMap = new Map(technicians.map((t) => [t.id, t]));
+    const merged: TechnicianProfile[] = [...technicians];
+
+    // Keep any pending or existing local technicians that were not present in incoming
+    for (const c of current) {
+      if (!incomingMap.has(c.id)) {
+        merged.push(c);
+      }
+    }
+
+    // Ensure all have valid technicianCode
+    let codeIndex = 1001;
+    for (const tech of merged) {
+      if (!tech.technicianCode) {
+        tech.technicianCode = `NF-TECH-${codeIndex++}`;
+      }
+    }
+
+    localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(merged));
     this.notify();
   }
 
@@ -380,7 +438,31 @@ class StorageService {
       technicians.unshift(newProfile);
     }
 
+    // Save in main store
     localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+
+    // Save in dedicated pending queue so it cannot be cleared
+    try {
+      const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
+      const pIdx = pending.findIndex((p) => p.id === newProfile.id || p.userId === newProfile.userId);
+      if (pIdx >= 0) {
+        pending[pIdx] = newProfile;
+      } else {
+        pending.unshift(newProfile);
+      }
+      localStorage.setItem(KEYS.PENDING_APPLICATIONS, JSON.stringify(pending));
+    } catch (e) {
+      console.warn('Error saving pending application:', e);
+    }
+
+    // Add Audit Log
+    this.addAuditLog({
+      adminName: 'NeedFix System',
+      technicianId: newProfile.id,
+      technicianName: newProfile.companyName || newProfile.fullName,
+      action: 'reactivated',
+      reason: `New technician registration submitted (ID: ${newProfile.technicianCode}) for ${newProfile.categoryName}. Awaiting Admin Approval.`,
+    });
 
     // Update user profile record to mark technician registered
     const currentUser = this.getCurrentUser();
@@ -413,12 +495,14 @@ class StorageService {
     tech.reviewedBy = adminName;
 
     if (status === 'approved') {
+      tech.isApproved = true;
       tech.isVerified = true;
       tech.verifiedAt = new Date().toISOString();
       tech.isOnline = true;
       tech.rejectionReason = undefined;
       tech.suspensionReason = undefined;
     } else if (status === 'rejected') {
+      tech.isApproved = false;
       tech.isVerified = false;
       tech.rejectionReason = reason || 'Documents or service information could not be verified.';
     } else if (status === 'suspended') {
@@ -428,6 +512,15 @@ class StorageService {
     }
 
     localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+
+    // Also update in pending applications store
+    try {
+      const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
+      const updatedPending = pending.map((p) => (p.id === technicianId ? { ...p, status, isApproved: status === 'approved' } : p));
+      localStorage.setItem(KEYS.PENDING_APPLICATIONS, JSON.stringify(updatedPending));
+    } catch (e) {
+      console.warn('Error updating pending list:', e);
+    }
 
     // Update corresponding user role if approved
     const users = this.getUsers();
@@ -661,6 +754,22 @@ class StorageService {
       return JSON.parse(localStorage.getItem(KEYS.AUDIT_LOGS) || '[]');
     } catch {
       return [];
+    }
+  }
+
+  addAuditLog(log: Omit<AdminAuditLog, 'id' | 'timestamp'>): void {
+    try {
+      const auditLogs = this.getAuditLogs();
+      const newLog: AdminAuditLog = {
+        ...log,
+        id: `audit_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+      };
+      auditLogs.unshift(newLog);
+      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify(auditLogs.slice(0, 200)));
+      this.notify();
+    } catch (e) {
+      console.warn('Error adding audit log:', e);
     }
   }
 

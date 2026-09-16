@@ -77,28 +77,45 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
   const approvedTechnicians = technicians.filter((t) => t.status === 'approved');
 
-  const filteredTechnicians = approvedTechnicians.filter((tech) => {
-    if (selectedCategory !== 'all') {
-      const matches =
-        tech.categoryId === selectedCategory ||
-        (tech.categoryIds && tech.categoryIds.includes(selectedCategory));
-      if (!matches) return false;
-    }
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      const matchName = tech.fullName.toLowerCase().includes(q);
-      const matchCompany = tech.companyName.toLowerCase().includes(q);
-      const matchCategory =
-        tech.categoryName.toLowerCase().includes(q) ||
-        (tech.categoryNames &&
-          tech.categoryNames.some((cName) => cName.toLowerCase().includes(q)));
-      const matchCity = tech.location.city.toLowerCase().includes(q);
-      const matchServices = tech.servicesOffered?.some((s) => s.name.toLowerCase().includes(q));
-      if (!matchName && !matchCompany && !matchCategory && !matchCity && !matchServices)
-        return false;
-    }
-    return true;
-  });
+  const filteredTechnicians = approvedTechnicians
+    .filter((tech) => {
+      if (selectedCategory !== 'all') {
+        const matches =
+          tech.categoryId === selectedCategory ||
+          (tech.categoryIds && tech.categoryIds.includes(selectedCategory));
+        if (!matches) return false;
+      }
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = tech.fullName.toLowerCase().includes(q);
+        const matchCompany = tech.companyName.toLowerCase().includes(q);
+        const matchCategory =
+          tech.categoryName.toLowerCase().includes(q) ||
+          (tech.categoryNames &&
+            tech.categoryNames.some((cName) => cName.toLowerCase().includes(q)));
+        const matchCity = tech.location.city.toLowerCase().includes(q);
+        const matchServices = tech.servicesOffered?.some((s) => s.name.toLowerCase().includes(q));
+        if (!matchName && !matchCompany && !matchCategory && !matchCity && !matchServices)
+          return false;
+      }
+      return true;
+    })
+    .sort((a, b) => {
+      // Proximity sort: Closest to current GPS location appears first!
+      const distA = calculateDistanceKm(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        a.location.latitude,
+        a.location.longitude
+      );
+      const distB = calculateDistanceKm(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        b.location.latitude,
+        b.location.longitude
+      );
+      return distA - distB;
+    });
 
   return (
     <div className="min-h-screen bg-slate-900/10 flex justify-center py-0 sm:py-6 px-0 sm:px-4">

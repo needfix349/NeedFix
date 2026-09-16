@@ -38,6 +38,7 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
   onRequireAuth,
 }) => {
   const category = SERVICE_CATEGORIES.find((c) => c.id === technician.categoryId);
+  const techCode = technician.technicianCode || `NF-TECH-${technician.id.slice(-4).toUpperCase()}`;
 
   // Calculate real GPS distance
   const distanceKm = userLocation
@@ -56,7 +57,9 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
       type: 'call',
       metadata: { phone: technician.mobile },
     });
-    window.location.href = `tel:+91${technician.mobile}`;
+    // Sanitize mobile to 10 digits
+    const cleanPhone = technician.mobile.replace(/\D/g, '').slice(-10);
+    window.location.href = `tel:+91${cleanPhone}`;
   };
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
@@ -64,12 +67,14 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
-      metadata: { whatsapp: technician.whatsappNumber },
+      metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });
-    const message = `Hello ${technician.fullName}, I found your verified profile on NeedFix for ${technician.categoryName} services. Are you available for a service call?`;
+    const cleanPhone = (technician.whatsappNumber || technician.mobile).replace(/\D/g, '').slice(-10);
+    const message = `Hello ${technician.fullName}, I found your verified profile (ID: ${techCode}) on NeedFix for ${technician.categoryName} services. Are you available for a service call?`;
     window.open(
-      `https://wa.me/91${technician.whatsappNumber}?text=${encodeURIComponent(message)}`,
-      '_blank'
+      `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer'
     );
   };
 
@@ -79,13 +84,21 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
       className="bg-white rounded-3xl border border-slate-200/90 shadow-xs hover:shadow-xl hover:border-blue-300 transition-all duration-200 overflow-hidden flex flex-col justify-between group cursor-pointer relative w-full max-w-full box-border"
     >
       <div className="p-4 sm:p-5 space-y-3.5">
-        {/* Top bar: Category badges, Verified badge & Favorite button */}
+        {/* Top bar: Category badges, Technician ID, Verified badge & Favorite button */}
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Technician ID Badge */}
+            <span
+              className="text-[11px] font-mono font-bold bg-slate-900 text-amber-300 px-2 py-0.5 rounded-lg border border-slate-700 shadow-2xs tracking-wide"
+              title="Official Technician ID Number"
+            >
+              ID: {techCode}
+            </span>
+
             {(technician.categoryIds && technician.categoryIds.length > 0
               ? technician.categoryIds
               : [technician.categoryId]
-            ).slice(0, 3).map((catId) => {
+            ).slice(0, 2).map((catId) => {
               const catObj = SERVICE_CATEGORIES.find((c) => c.id === catId);
               return (
                 <span
@@ -101,9 +114,9 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
                 </span>
               );
             })}
-            {technician.categoryIds && technician.categoryIds.length > 3 && (
+            {technician.categoryIds && technician.categoryIds.length > 2 && (
               <span className="text-[10px] bg-blue-50 text-blue-700 font-bold px-1.5 py-0.5 rounded-lg">
-                +{technician.categoryIds.length - 3} more
+                +{technician.categoryIds.length - 2}
               </span>
             )}
             {technician.isVerified && <VerifiedBadge size="sm" showText={true} />}

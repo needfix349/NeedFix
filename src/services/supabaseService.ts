@@ -650,6 +650,8 @@ export class SupabaseService {
    * 7. Fetch all technicians (pending, approved, blocked, rejected) for Admin verification
    */
   async getAllTechniciansForAdmin(): Promise<TechnicianProfile[]> {
+    const localTechs = storageService.getTechnicians();
+
     if (isSupabaseConfigured()) {
       try {
         const { data, error } = await supabase
@@ -711,14 +713,23 @@ export class SupabaseService {
             totalWhatsAppClicks: d.total_whatsapp_clicks || 0,
           }));
 
-          storageService.setTechnicians(mapped);
-          return mapped;
+          // Merge: ensure all local technicians (especially pending ones) are kept!
+          const remoteIds = new Set(mapped.map((t) => t.id));
+          const combined = [...mapped];
+          for (const lt of localTechs) {
+            if (!remoteIds.has(lt.id)) {
+              combined.push(lt);
+            }
+          }
+
+          storageService.setTechnicians(combined);
+          return combined;
         }
       } catch (err) {
         console.warn('Supabase fetch all technicians exception:', err);
       }
     }
-    return storageService.getTechnicians();
+    return localTechs;
   }
 }
 

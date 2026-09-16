@@ -594,41 +594,63 @@ async function getIPBasedLocation(): Promise<UserLocation | null> {
  * 4. Stored user location / Nearest Indian district
  */
 export async function getCurrentGPSLocation(): Promise<UserLocation> {
-  // Step 1: Try High Accuracy GPS (Satellite/GNSS lock)
+  // Step 1: Try High Accuracy GPS (Satellite/GNSS lock) with generous 10s timeout
   try {
     const pos = await getBrowserPosition({
       enableHighAccuracy: true,
-      timeout: 5000,
+      timeout: 10000,
       maximumAge: 30000,
     });
     const { latitude, longitude, accuracy } = pos.coords;
     const result = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
-    return { ...result, isGpsLocked: true };
+    const lockedLoc = { ...result, isGpsLocked: true };
+    try {
+      localStorage.setItem('needfix_last_gps_location', JSON.stringify(lockedLoc));
+    } catch {}
+    return lockedLoc;
   } catch (firstErr: any) {
-    console.info('High accuracy GPS timed out or unavailable, trying network positioning...', firstErr?.message);
+    console.info('High accuracy GPS prompt or satellite lock pending, trying network positioning...', firstErr?.message);
   }
 
   // Step 2: Try Low Accuracy (WiFi Hotspots & Cellular Network Triangulation - Very fast & works indoors)
   try {
     const pos = await getBrowserPosition({
       enableHighAccuracy: false,
-      timeout: 6000,
+      timeout: 10000,
       maximumAge: 60000,
     });
     const { latitude, longitude, accuracy } = pos.coords;
     const result = await reverseGeocodeCoordinates(latitude, longitude, accuracy);
-    return { ...result, isGpsLocked: true };
+    const lockedLoc = { ...result, isGpsLocked: true };
+    try {
+      localStorage.setItem('needfix_last_gps_location', JSON.stringify(lockedLoc));
+    } catch {}
+    return lockedLoc;
   } catch (secondErr: any) {
-    console.warn('Network browser geolocation failed:', secondErr?.message);
+    console.warn('Network browser geolocation failed or denied:', secondErr?.message);
   }
 
-  // Step 3: Try IP Geolocation (Detect city & state without requiring browser prompt)
+  // Step 3: Check if we have a recent stored GPS location from previous session
+  try {
+    const saved = localStorage.getItem('needfix_last_gps_location');
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed && parsed.latitude && parsed.longitude) {
+        return { ...parsed, isGpsLocked: true };
+      }
+    }
+  } catch {}
+
+  // Step 4: Try IP Geolocation (Detect city & state without requiring browser prompt)
   const ipLoc = await getIPBasedLocation();
   if (ipLoc) {
+    try {
+      localStorage.setItem('needfix_last_gps_location', JSON.stringify(ipLoc));
+    } catch {}
     return ipLoc;
   }
 
-  // Step 4: Fallback gracefully to default location
+  // Step 5: Fallback gracefully to default location
   return {
     ...DEFAULT_USER_LOCATION,
     address: DEFAULT_USER_LOCATION.address,

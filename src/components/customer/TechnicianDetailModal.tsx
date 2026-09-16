@@ -51,6 +51,9 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   const [serviceUsed, setServiceUsed] = useState(technician.categoryName);
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedTechCode, setCopiedTechCode] = useState(false);
+
+  const techCode = technician.technicianCode || `NF-TECH-${technician.id.slice(-4).toUpperCase()}`;
 
   useEffect(() => {
     // Log profile view activity
@@ -76,7 +79,8 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
       type: 'call',
       metadata: { phone: technician.mobile },
     });
-    window.location.href = `tel:+91${technician.mobile}`;
+    const cleanPhone = technician.mobile.replace(/\D/g, '').slice(-10);
+    window.location.href = `tel:+91${cleanPhone}`;
   };
 
   const handleCallForService = (serviceName: string) => {
@@ -85,19 +89,22 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
       type: 'call',
       metadata: { phone: technician.mobile, service: serviceName },
     });
-    window.location.href = `tel:+91${technician.mobile}`;
+    const cleanPhone = technician.mobile.replace(/\D/g, '').slice(-10);
+    window.location.href = `tel:+91${cleanPhone}`;
   };
 
   const handleWhatsApp = () => {
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
-      metadata: { whatsapp: technician.whatsappNumber },
+      metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });
-    const message = `Hello ${technician.fullName}, I am contacting you via NeedFix regarding ${technician.categoryName} services. Are you available for a booking?`;
+    const cleanPhone = (technician.whatsappNumber || technician.mobile).replace(/\D/g, '').slice(-10);
+    const message = `Hello ${technician.fullName}, I am contacting you via NeedFix (Technician ID: ${techCode}) regarding ${technician.categoryName} services. Are you available for a booking?`;
     window.open(
-      `https://wa.me/91${technician.whatsappNumber}?text=${encodeURIComponent(message)}`,
-      '_blank'
+      `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer'
     );
   };
 
@@ -105,14 +112,16 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
     storageService.logActivity({
       technicianId: technician.id,
       type: 'whatsapp',
-      metadata: { whatsapp: technician.whatsappNumber, service: serviceName },
+      metadata: { whatsapp: technician.whatsappNumber || technician.mobile, service: serviceName },
     });
+    const cleanPhone = (technician.whatsappNumber || technician.mobile).replace(/\D/g, '').slice(-10);
     const srv = technician.servicesOffered?.find((s) => s.name === serviceName);
     const priceText = srv ? ` (₹${srv.price})` : '';
-    const message = `Hello ${technician.fullName}, I am contacting you via NeedFix regarding your service: "${serviceName}"${priceText}. Are you available?`;
+    const message = `Hello ${technician.fullName}, I am contacting you via NeedFix (Technician ID: ${techCode}) regarding your service: "${serviceName}"${priceText}. Are you available?`;
     window.open(
-      `https://wa.me/91${technician.whatsappNumber}?text=${encodeURIComponent(message)}`,
-      '_blank'
+      `https://wa.me/91${cleanPhone}?text=${encodeURIComponent(message)}`,
+      '_blank',
+      'noopener,noreferrer'
     );
   };
 
@@ -254,6 +263,52 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
 
         {/* Scrollable Body Content */}
         <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800">
+          {/* Official Technician ID & Admin Complaint Card */}
+          <div className="bg-slate-900 text-white rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-slate-700">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-mono font-extrabold flex items-center justify-center shrink-0 text-sm shadow-xs">
+                ID
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs text-slate-300 font-medium">Technician ID Number:</span>
+                  <span className="text-sm font-mono font-bold text-amber-300 tracking-wider bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
+                    {techCode}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-400 mt-0.5">
+                  Keep this ID number safe. You can report or complain to NeedFix Admin using this ID.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  if (navigator.clipboard) {
+                    navigator.clipboard.writeText(techCode);
+                    setCopiedTechCode(true);
+                    setTimeout(() => setCopiedTechCode(false), 2500);
+                  }
+                }}
+                className="flex-1 sm:flex-none py-2 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white rounded-xl text-xs font-bold border border-slate-600 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                title="Copy Technician ID"
+              >
+                <FileText size={13} className="text-amber-400" />
+                <span>{copiedTechCode ? 'Copied ID!' : 'Copy ID'}</span>
+              </button>
+
+              <a
+                href={`mailto:needfix349@gmail.com?subject=Complaint%20regarding%20Technician%20ID%20${encodeURIComponent(techCode)}%20(${encodeURIComponent(technician.fullName)})&body=Dear%20NeedFix%20Admin%2C%0A%0AI%20am%20a%20NeedFix%20customer%20submitting%20a%20complaint%20regarding%20this%20service%20provider%3A%0A%0A-%20Technician%20ID%3A%20${encodeURIComponent(techCode)}%0A-%20Technician%20Name%3A%20${encodeURIComponent(technician.fullName)}%0A-%20Service%20Trade%3A%20${encodeURIComponent(technician.categoryName)}%0A-%20Technician%20Phone%3A%20${encodeURIComponent(technician.mobile)}%0A%0ADescription%20of%20Complaint%20%2F%20Issue%3A%0A`}
+                className="flex-1 sm:flex-none py-2 px-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                title="File a complaint to Admin regarding this technician"
+              >
+                <span>Complain to Admin</span>
+              </a>
+            </div>
+          </div>
+
           {/* Verification Badge & Guarantee Seal */}
           {technician.isVerified && (
             <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-2xl p-4 flex items-start gap-3 shadow-xs">

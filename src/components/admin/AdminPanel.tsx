@@ -112,7 +112,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const isAdmin = currentUser?.role === 'admin';
 
   // Counts
-  const pendingTechs = useMemo(() => technicians.filter((t) => t.status === 'pending'), [technicians]);
+  const pendingTechs = useMemo(
+    () =>
+      technicians.filter(
+        (t) =>
+          (t.status === 'pending' || (!t.isApproved && t.status !== 'rejected' && t.status !== 'suspended')) &&
+          !t.isBlocked
+      ),
+    [technicians]
+  );
   const approvedTechs = useMemo(
     () => technicians.filter((t) => t.status === 'approved' && !t.isBlocked),
     [technicians]
@@ -252,7 +260,11 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const filteredTechnicians = useMemo(() => {
     return technicians.filter((t) => {
       // Tab filter
-      if (activeTab === 'pending' && t.status !== 'pending') return false;
+      const isPending =
+        (t.status === 'pending' || (!t.isApproved && t.status !== 'rejected' && t.status !== 'suspended')) &&
+        !t.isBlocked;
+
+      if (activeTab === 'pending' && !isPending) return false;
       if (activeTab === 'blocked' && !t.isBlocked) return false;
       if (activeTab === 'all' && statusFilter !== 'all' && t.status !== statusFilter) return false;
 
