@@ -374,16 +374,18 @@ export const Navbar: React.FC<NavbarProps> = ({
                       </button>
                     )}
 
-                    <button
-                      onClick={() => {
-                        onNavigate('admin_panel');
-                        setShowProfileMenu(false);
-                      }}
-                      className="w-full text-left p-2 hover:bg-purple-50 text-purple-800 rounded-xl flex items-center gap-2 font-bold"
-                    >
-                      <Shield size={14} className="text-purple-600" />
-                      <span>{currentUser.role === 'admin' ? 'Admin Approval Center' : 'Admin Portal & Moderation'}</span>
-                    </button>
+                    {currentUser.role === 'admin' && (
+                      <button
+                        onClick={() => {
+                          onNavigate('admin_panel');
+                          setShowProfileMenu(false);
+                        }}
+                        className="w-full text-left p-2 hover:bg-purple-50 text-purple-800 rounded-xl flex items-center gap-2 font-bold"
+                      >
+                        <Shield size={14} className="text-purple-600" />
+                        <span>Admin Approval Center</span>
+                      </button>
+                    )}
 
                     {/* File a Complaint / Help Menu item */}
                     <button

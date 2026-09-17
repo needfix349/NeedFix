@@ -498,7 +498,10 @@ export class SupabaseService {
           starting_price: newProfile.startingPrice,
           technician_code: newProfile.technicianCode,
           is_blocked: false,
+          aadhaar_number: newProfile.documents?.aadhaarNumber || null,
           aadhaar_url: newProfile.documents?.aadhaarDocUrl || '',
+          ip_address: newProfile.ipAddress || null,
+          device_id: newProfile.deviceId || null,
           is_approved: false, // strictly false until admin approval
           is_verified: false,
           is_online: false,
@@ -686,9 +689,11 @@ export class SupabaseService {
             businessDescription: '',
             profilePhotoUrl: d.profile_photo_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
             companyLogoUrl: d.company_logo_url || '',
+            ipAddress: d.ip_address || '127.0.0.1',
+            deviceId: d.device_id || 'DEV-VERIFIED',
             portfolioImages: [],
             documents: {
-              aadhaarNumber: 'Verified',
+              aadhaarNumber: d.aadhaar_number || 'Verified',
               aadhaarDocUrl: d.aadhaar_url,
             },
             startingPrice: d.starting_price || 299,

@@ -2,6 +2,7 @@ import React from 'react';
 import {
   Mail,
   HelpCircle,
+  Shield,
   ShieldCheck,
   AlertTriangle,
   Phone,
@@ -252,9 +253,11 @@ export const Footer: React.FC<FooterProps> = ({
             <button
               type="button"
               onClick={onOpenAdmin}
-              className="text-purple-400 hover:text-purple-300 transition-colors"
+              className="text-slate-500 hover:text-slate-300 transition-colors flex items-center gap-1 cursor-pointer"
+              title="NeedFix Administrator Login Portal"
             >
-              Admin Portal
+              <Shield size={11} className="text-slate-500 group-hover:text-slate-300" />
+              <span>Admin Login</span>
             </button>
           </div>
         </div>

@@ -76,13 +76,15 @@ export interface TechnicianServiceItem {
 
 export interface TechnicianProfile {
   id: string;
-  technicianCode?: string; // Auto-generated unique ID e.g. "NF-TECH-1001"
+  technicianCode?: string; // Auto-generated unique ID e.g. "TECH-1001"
   userId: string;
   fullName: string;
   mobile: string;
   whatsappNumber: string;
   email?: string;
   companyName: string;
+  ipAddress?: string; // Real IP address captured on entry
+  deviceId?: string; // Unique Device Fingerprint captured on entry
   categoryId: string;
   categoryName: string;
   categoryIds?: string[];
@@ -188,3 +190,44 @@ export interface AdminAuditLog {
   reason?: string;
   timestamp: string;
 }
+
+export interface CustomerRecord {
+  id: string;
+  customerId: string; // 'CUST-XXXX'
+  name: string;
+  phone?: string;
+  ipAddress: string;
+  deviceId: string;
+  userAgent?: string;
+  lastSeenAt: string;
+  createdAt: string;
+  isBlocked: boolean;
+  blockedReason?: string;
+  blockedAt?: string;
+  blockedBy?: string;
+}
+
+export interface BlockedDeviceRecord {
+  id: string;
+  deviceId: string;
+  ipAddress: string;
+  targetType: 'customer' | 'technician';
+  targetId?: string;
+  uniqueId: string; // 'CUST-XXXX' or 'TECH-XXXX'
+  targetName: string;
+  targetPhone?: string;
+  reason: string;
+  blockedBy: string;
+  blockedAt: string;
+}
+
+export interface DeviceSecurityStatus {
+  isBlocked: boolean;
+  reason?: string;
+  blockedAt?: string;
+  blockedBy?: string;
+  uniqueId?: string;
+  ip: string;
+  deviceId: string;
+}
+

@@ -13,12 +13,15 @@ import { NeedFixAppIcon } from './components/common/NeedFixAppIcon';
 import { Footer } from './components/layout/Footer';
 import { HelpSupportModal } from './components/common/HelpSupportModal';
 import { OfflineIndicator } from './components/common/OfflineIndicator';
+import { BlockedAccessScreen } from './components/security/BlockedAccessScreen';
+import { deviceSecurityService } from './services/deviceSecurityService';
 
 import {
   UserProfile,
   TechnicianProfile,
   ServiceLead,
   UserLocation,
+  DeviceSecurityStatus,
 } from './types';
 import { storageService } from './services/storage';
 import { otpService } from './services/otpService';
@@ -51,6 +54,24 @@ export default function App() {
   const [showTechRegistrationModal, setShowTechRegistrationModal] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState<TechnicianProfile | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [securityStatus, setSecurityStatus] = useState<DeviceSecurityStatus | null>(null);
+
+  // Universal IP & Device Security Verification & Visitor Tracking
+  const runDeviceSecurityVerification = async () => {
+    try {
+      const sec = await deviceSecurityService.checkDeviceBlocked();
+      setSecurityStatus(sec);
+      if (!sec.isBlocked) {
+        const activeUser = storageService.getCurrentUser();
+        await deviceSecurityService.trackCustomerEntry(
+          activeUser?.name,
+          activeUser?.mobile
+        );
+      }
+    } catch (e) {
+      console.warn('Security check error:', e);
+    }
+  };
 
   const handleRequireAuth = (actionDescription?: string, role: 'customer' | 'technician' = 'customer') => {
     if (role === 'technician') {
@@ -100,7 +121,12 @@ export default function App() {
 
   useEffect(() => {
     syncState();
-    const unsubStorage = storageService.subscribe(syncState);
+    runDeviceSecurityVerification();
+    const unsubStorage = storageService.subscribe(() => {
+      syncState();
+      // Re-verify blocking status if local storage changes
+      deviceSecurityService.checkDeviceBlocked().then(setSecurityStatus).catch(() => {});
+    });
 
     // Show Important Notice modal after 5 seconds of entering (if not already agreed)
     const noticeTimer = setTimeout(() => {
@@ -266,6 +292,16 @@ export default function App() {
     supabase.auth.signOut().catch(() => {});
   };
 
+  // Universal IP & Device Blocking Lockdown: Completely freeze interface if blocked
+  if (securityStatus?.isBlocked) {
+    return (
+      <BlockedAccessScreen
+        status={securityStatus}
+        onRefreshCheck={runDeviceSecurityVerification}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900 flex flex-col font-sans selection:bg-blue-600 selection:text-white w-full max-w-full overflow-x-hidden">
       {/* Offline PWA Connectivity Indicator */}
@@ -280,8 +316,8 @@ export default function App() {
         canGoBack={activeView !== 'home' || Boolean(selectedTechnician || showTechRegistrationModal || showHelpModal)}
         onBack={handleGoBack}
         onNavigate={(view) => {
-          if ((view === 'technician_dashboard' || view === 'admin_panel') && !currentUser) {
-            setAuthInitialRole(view === 'technician_dashboard' ? 'technician' : 'customer');
+          if (view === 'technician_dashboard' && !currentUser) {
+            setAuthInitialRole('technician');
             setShowAuthModal(true);
             return;
           }

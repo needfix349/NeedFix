@@ -36,6 +36,7 @@ import { supabaseService } from '../../services/supabaseService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { SERVICE_CATEGORIES } from '../../data/categories';
+import { UserSecurityDirectory } from './UserSecurityDirectory';
 
 interface AdminPanelProps {
   currentUser?: UserProfile | null;
@@ -56,7 +57,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [technicians, setTechnicians] = useState<TechnicianProfile[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [selectedTech, setSelectedTech] = useState<TechnicianProfile | null>(null);
-  const [activeTab, setActiveTab] = useState<'pending' | 'all' | 'blocked' | 'audit'>('pending');
+  const [activeTab, setActiveTab] = useState<
+    'pending' | 'all' | 'security_directory' | 'blocked' | 'audit'
+  >('pending');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [idSearchQuery, setIdSearchQuery] = useState('');
@@ -65,8 +68,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Zoomed Aadhaar image preview modal
   const [zoomedAadhaarUrl, setZoomedAadhaarUrl] = useState<string | null>(null);
 
-  // Admin Login state (Supabase Email & Password) - Secure empty defaults
-  const [adminEmail, setAdminEmail] = useState('');
+  // Admin Login state (Supabase Email & Password)
+  const [adminEmail, setAdminEmail] = useState('needfix349@gmail.com');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -108,6 +111,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     const unsubscribe = storageService.subscribe(loadData);
     return unsubscribe;
   }, []);
+
+  useEffect(() => {
+    if (propUser) {
+      setCurrentUser(propUser);
+    }
+  }, [propUser]);
 
   const isAdmin = currentUser?.role === 'admin';
 
@@ -352,14 +361,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
             <div>
               <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1.5">
-                Admin Email Address
+                Admin Email Address / ID
               </label>
               <input
                 type="email"
                 required
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="Enter admin email"
+                placeholder="needfix349@gmail.com"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
             </div>
@@ -382,7 +391,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Enter admin password"
+                placeholder="Enter password (e.g. Nadeem@1266)"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
             </div>
@@ -396,7 +405,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 {loginLoading ? (
                   <>
                     <span className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
-                    <span>Verifying with Supabase Auth...</span>
+                    <span>Verifying Administrator Credentials...</span>
                   </>
                 ) : (
                   <>
@@ -579,6 +588,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             </button>
 
             <button
+              onClick={() => setActiveTab('security_directory')}
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'security_directory'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Users size={14} />
+              <span>Customers & Techs Security Directory</span>
+            </button>
+
+            <button
               onClick={() => setActiveTab('audit')}
               className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'audit'
@@ -593,7 +614,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         </div>
 
         {/* Search & Filter Controls (Dedicated Auto ID Search & Name Search) */}
-        {activeTab !== 'audit' && (
+        {activeTab !== 'audit' && activeTab !== 'security_directory' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
             {/* Dedicated Technician ID Search */}
             <div className="relative">
@@ -672,6 +693,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         )}
 
+        {/* SECURITY & USER DIRECTORY TAB (CUSTOMERS & TECHS WITH IP & DEVICE TRACKING) */}
+        {activeTab === 'security_directory' && (
+          <UserSecurityDirectory
+            adminName={currentUser?.name || 'Administrator'}
+            technicians={technicians}
+            onRefreshData={loadData}
+          />
+        )}
+
         {/* AUDIT LOG TAB */}
         {activeTab === 'audit' && (
           <div className="space-y-3">
@@ -730,7 +760,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         )}
 
         {/* VERIFICATION VIEW: APPLICATIONS & DIRECTORY LIST */}
-        {activeTab !== 'audit' && (
+        {activeTab !== 'audit' && activeTab !== 'security_directory' && (
           <div className="space-y-3">
             {filteredTechnicians.length === 0 ? (
               <div className="py-12 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-300">

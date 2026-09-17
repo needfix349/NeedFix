@@ -7,6 +7,8 @@ import {
   ActivityLog,
   ApplicationStatus,
   UserLocation,
+  CustomerRecord,
+  BlockedDeviceRecord,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -29,6 +31,8 @@ const KEYS = {
   AUDIT_LOGS: 'needfix_v9_audit_logs',
   ACTIVITY_LOGS: 'needfix_v9_activity_logs',
   FAVORITES: 'needfix_v9_favorites',
+  CUSTOMERS: 'needfix_v9_customers',
+  BLOCKED_DEVICES: 'needfix_v9_blocked_devices',
 };
 
 class StorageService {
@@ -357,11 +361,11 @@ class StorageService {
       }
     }
 
-    // Ensure all have valid technicianCode
-    let codeIndex = 1001;
+    // Ensure all have valid technicianCode (unlimited sequential format TECH-1, TECH-2...)
+    let codeIndex = 1;
     for (const tech of merged) {
       if (!tech.technicianCode) {
-        tech.technicianCode = `NF-TECH-${codeIndex++}`;
+        tech.technicianCode = `TECH-${codeIndex++}`;
       }
     }
 
@@ -369,13 +373,13 @@ class StorageService {
     this.notify();
   }
 
-  // Auto-generate unique technician code e.g. NF-TECH-1007
+  // Auto-generate unique technician code: auto-incrementing unlimited sequential numbers (TECH-1, TECH-2...)
   generateNextTechnicianCode(): string {
     const technicians = this.getTechnicians();
-    let maxNumber = 1000;
+    let maxNumber = 0;
     technicians.forEach((t) => {
       if (t.technicianCode) {
-        const match = t.technicianCode.match(/NF-TECH-(\d+)/i);
+        const match = t.technicianCode.match(/(?:NF-)?TECH-(\d+)/i);
         if (match && match[1]) {
           const num = parseInt(match[1], 10);
           if (!isNaN(num) && num > maxNumber) {
@@ -384,7 +388,7 @@ class StorageService {
         }
       }
     });
-    return `NF-TECH-${maxNumber + 1}`;
+    return `TECH-${maxNumber + 1}`;
   }
 
   // Customers must only see approved & non-blocked technicians!
@@ -825,6 +829,138 @@ class StorageService {
   setGuestLocation(loc: UserLocation): void {
     localStorage.setItem('needfix_guest_location', JSON.stringify(loc));
     this.notify();
+  }
+
+  // --- CUSTOMER TRACKING STORAGE ---
+  getCustomers(): CustomerRecord[] {
+    try {
+      const raw = localStorage.getItem(KEYS.CUSTOMERS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  saveCustomer(customer: CustomerRecord): void {
+    try {
+      const list = this.getCustomers();
+      const idx = list.findIndex(
+        (c) => c.customerId === customer.customerId || c.id === customer.id || (c.deviceId && c.deviceId === customer.deviceId)
+      );
+      if (idx >= 0) {
+        list[idx] = {
+          ...list[idx],
+          ...customer,
+          lastSeenAt: new Date().toISOString(),
+        };
+      } else {
+        list.unshift(customer);
+      }
+      localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(list.slice(0, 500)));
+      this.notify();
+    } catch (e) {
+      console.warn('Error saving customer:', e);
+    }
+  }
+
+  setCustomers(customers: CustomerRecord[]): void {
+    try {
+      localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(customers));
+      this.notify();
+    } catch (e) {
+      console.warn('Error setting customers:', e);
+    }
+  }
+
+  updateCustomerBlockStatus(
+    customerId: string,
+    isBlocked: boolean,
+    reason?: string,
+    blockedBy?: string
+  ): CustomerRecord | undefined {
+    try {
+      const list = this.getCustomers();
+      const target = list.find((c) => c.customerId === customerId || c.id === customerId);
+      if (target) {
+        target.isBlocked = isBlocked;
+        target.blockedReason = isBlocked ? reason : undefined;
+        target.blockedAt = isBlocked ? new Date().toISOString() : undefined;
+        target.blockedBy = isBlocked ? blockedBy : undefined;
+        localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(list));
+        this.notify();
+        return target;
+      }
+    } catch (e) {
+      console.warn('Error updating customer block status:', e);
+    }
+    return undefined;
+  }
+
+  // --- BLOCKED DEVICES & IPS STORAGE ---
+  getBlockedDevices(): BlockedDeviceRecord[] {
+    try {
+      const raw = localStorage.getItem(KEYS.BLOCKED_DEVICES);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  setBlockedDevices(records: BlockedDeviceRecord[]): void {
+    try {
+      localStorage.setItem(KEYS.BLOCKED_DEVICES, JSON.stringify(records));
+      this.notify();
+    } catch (e) {
+      console.warn('Error setting blocked devices:', e);
+    }
+  }
+
+  addBlockedDevice(record: BlockedDeviceRecord): void {
+    try {
+      const list = this.getBlockedDevices();
+      const filtered = list.filter(
+        (b) =>
+          b.uniqueId !== record.uniqueId &&
+          b.deviceId !== record.deviceId &&
+          (!b.ipAddress || b.ipAddress !== record.ipAddress)
+      );
+      filtered.unshift(record);
+      localStorage.setItem(KEYS.BLOCKED_DEVICES, JSON.stringify(filtered));
+      this.notify();
+    } catch (e) {
+      console.warn('Error adding blocked device:', e);
+    }
+  }
+
+  removeBlockedDevice(uniqueIdOrDeviceIdOrIp: string): void {
+    try {
+      const list = this.getBlockedDevices();
+      const filtered = list.filter(
+        (b) =>
+          b.uniqueId !== uniqueIdOrDeviceIdOrIp &&
+          b.deviceId !== uniqueIdOrDeviceIdOrIp &&
+          b.ipAddress !== uniqueIdOrDeviceIdOrIp &&
+          b.id !== uniqueIdOrDeviceIdOrIp
+      );
+      localStorage.setItem(KEYS.BLOCKED_DEVICES, JSON.stringify(filtered));
+      this.notify();
+    } catch (e) {
+      console.warn('Error removing blocked device:', e);
+    }
+  }
+
+  isDeviceOrIpBlocked(deviceId: string, ipAddress: string): BlockedDeviceRecord | null {
+    try {
+      const list = this.getBlockedDevices();
+      const match = list.find((b) => {
+        if (deviceId && b.deviceId && b.deviceId === deviceId) return true;
+        if (ipAddress && b.ipAddress && b.ipAddress !== '127.0.0.1' && b.ipAddress === ipAddress) return true;
+        return false;
+      });
+      return match || null;
+    } catch {
+      return null;
+    }
   }
 }
 

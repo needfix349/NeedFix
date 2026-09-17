@@ -32,6 +32,7 @@ import { SERVICE_CATEGORIES } from '../../data/categories';
 import { CategoryLogo } from '../common/CategoryLogo';
 import { storageService } from '../../services/storage';
 import { supabaseService } from '../../services/supabaseService';
+import { deviceSecurityService } from '../../services/deviceSecurityService';
 import { getCurrentGPSLocation, DEFAULT_USER_LOCATION } from '../../services/locationService';
 import { GuidedAadhaarKYCModal } from '../kyc/GuidedAadhaarKYCModal';
 
@@ -352,8 +353,16 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       }
     }
 
+    // Automatically capture IP & Device Fingerprint and assign auto-incrementing unlimited sequential Technician ID ('TECH-1', 'TECH-2'...)
+    const ipAddress = await deviceSecurityService.getRealIPAddress();
+    const deviceId = deviceSecurityService.getDeviceId();
+    const technicianCode = await deviceSecurityService.generateTechnicianIdAsync();
+
     const applicationData = {
       userId: currentUser.id,
+      technicianCode,
+      ipAddress,
+      deviceId,
       fullName: companyName.trim(), // Use Store/Company name as primary identity
       mobile: mobile.trim(),
       whatsappNumber: whatsappNumber.trim(),
