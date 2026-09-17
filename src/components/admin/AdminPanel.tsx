@@ -68,8 +68,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   // Zoomed Aadhaar image preview modal
   const [zoomedAadhaarUrl, setZoomedAadhaarUrl] = useState<string | null>(null);
 
-  // Admin Login state (Supabase Email & Password)
-  const [adminEmail, setAdminEmail] = useState('needfix349@gmail.com');
+  // Admin Login state (Supabase Email & Password) - Secure blank defaults
+  const [adminEmail, setAdminEmail] = useState('');
   const [adminPassword, setAdminPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginLoading, setLoginLoading] = useState(false);
@@ -368,7 +368,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={adminEmail}
                 onChange={(e) => setAdminEmail(e.target.value)}
-                placeholder="needfix349@gmail.com"
+                placeholder="Enter administrator email"
+                autoComplete="email"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
             </div>
@@ -391,7 +392,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 required
                 value={adminPassword}
                 onChange={(e) => setAdminPassword(e.target.value)}
-                placeholder="Enter password (e.g. Nadeem@1266)"
+                placeholder="Enter administrator password"
+                autoComplete="current-password"
                 className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-300 rounded-xl outline-none focus:border-blue-600 font-medium"
               />
             </div>
