@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { CustomerHome } from './components/customer/CustomerHome';
 import { TechnicianDashboard } from './components/technician/TechnicianDashboard';
@@ -73,6 +73,114 @@ export default function App() {
     }
   };
 
+  // Ref to always track current navigation & modal state for popstate handler
+  const navStateRef = useRef({
+    activeView,
+    selectedTechnician,
+    showTechRegistrationModal,
+    showAuthModal,
+    showHelpModal,
+    showImportantNoticeModal,
+  });
+
+  useEffect(() => {
+    navStateRef.current = {
+      activeView,
+      selectedTechnician,
+      showTechRegistrationModal,
+      showAuthModal,
+      showHelpModal,
+      showImportantNoticeModal,
+    };
+  });
+
+  // Push history state so the phone back button triggers popstate instead of exiting the site
+  const pushNavHistory = (tag: string) => {
+    try {
+      window.history.pushState({ needfix: true, tag, t: Date.now() }, '');
+    } catch (e) {
+      console.warn('History pushState warning:', e);
+    }
+  };
+
+  // Close whichever modal is currently active or return to home screen
+  const closeActiveModalOrView = () => {
+    const s = navStateRef.current;
+    if (s.selectedTechnician) {
+      setSelectedTechnician(null);
+      return true;
+    }
+    if (s.showTechRegistrationModal) {
+      setShowTechRegistrationModal(false);
+      return true;
+    }
+    if (s.showAuthModal) {
+      setShowAuthModal(false);
+      setAuthPromptMessage(undefined);
+      return true;
+    }
+    if (s.showHelpModal) {
+      setShowHelpModal(false);
+      return true;
+    }
+    if (s.showImportantNoticeModal) {
+      setShowImportantNoticeModal(false);
+      return true;
+    }
+    if (s.activeView !== 'home') {
+      setActiveView('home');
+      return true;
+    }
+    return false;
+  };
+
+  // Unified back handler: pop history if pushed, or close active modal/view directly
+  const handleGoBack = () => {
+    if (window.history.state && window.history.state.needfix) {
+      window.history.back();
+    } else {
+      closeActiveModalOrView();
+    }
+  };
+
+  // Navigation router with history support
+  const handleNavigateToView = (view: 'home' | 'technician_dashboard' | 'admin_panel') => {
+    if (view === 'technician_dashboard' && !currentUser) {
+      setAuthInitialRole('technician');
+      pushNavHistory('auth');
+      setShowAuthModal(true);
+      return;
+    }
+    if (view !== 'home' && activeView === 'home') {
+      pushNavHistory(`view_${view}`);
+    }
+    setActiveView(view);
+  };
+
+  const handleSelectTechnician = (tech: TechnicianProfile) => {
+    pushNavHistory('tech_detail');
+    setSelectedTechnician(tech);
+  };
+
+  const handleOpenTechnicianRegistration = () => {
+    if (!currentUser) {
+      handleRequireAuth('register as a service provider', 'technician');
+    } else {
+      pushNavHistory('tech_registration');
+      setShowTechRegistrationModal(true);
+    }
+  };
+
+  const handleOpenHelpSupport = () => {
+    pushNavHistory('help_support');
+    setShowHelpModal(true);
+  };
+
+  const handleOpenNoticeModal = () => {
+    pushNavHistory('notice');
+    setShowImportantNoticeModal(true);
+  };
+
   const handleRequireAuth = (actionDescription?: string, role: 'customer' | 'technician' = 'customer') => {
     if (role === 'technician') {
       setAuthPromptMessage('Technician verification is required to register and manage service provider profiles.');
@@ -82,34 +190,12 @@ export default function App() {
       setAuthPromptMessage('Please enter your details to contact technicians.');
     }
     setAuthInitialRole(role);
+    pushNavHistory('auth');
     setShowAuthModal(true);
   };
 
   const handleCloseAuthModal = () => {
-    setShowAuthModal(false);
-    setAuthPromptMessage(undefined);
-  };
-
-  const handleGoBack = () => {
-    if (selectedTechnician) {
-      setSelectedTechnician(null);
-      return;
-    }
-    if (showTechRegistrationModal) {
-      setShowTechRegistrationModal(false);
-      return;
-    }
-    if (showAuthModal) {
-      setShowAuthModal(false);
-      return;
-    }
-    if (showHelpModal) {
-      setShowHelpModal(false);
-      return;
-    }
-    if (activeView !== 'home') {
-      setActiveView('home');
-    }
+    handleGoBack();
   };
 
   // Load and subscribe to storage & Supabase auth
@@ -128,11 +214,23 @@ export default function App() {
       deviceSecurityService.checkDeviceBlocked().then(setSecurityStatus).catch(() => {});
     });
 
+    // Initialize root browser history state for seamless phone back navigation
+    if (!window.history.state || !window.history.state.needfixRoot) {
+      window.history.replaceState({ needfixRoot: true }, '');
+    }
+
+    // Handle physical/system phone back button navigation (popstate)
+    const onPopState = () => {
+      closeActiveModalOrView();
+    };
+    window.addEventListener('popstate', onPopState);
+
     // Show Important Notice modal after 5 seconds of entering (if not already agreed)
     const noticeTimer = setTimeout(() => {
       const activeUser = storageService.getCurrentUser();
       const hasAgreed = storageService.hasAgreedImportantNotice(activeUser?.id, activeUser?.email);
       if (!hasAgreed) {
+        pushNavHistory('notice');
         setShowImportantNoticeModal(true);
       }
     }, 5000);
@@ -204,6 +302,7 @@ export default function App() {
       clearTimeout(noticeTimer);
       unsubStorage();
       subscription.unsubscribe();
+      window.removeEventListener('popstate', onPopState);
     };
   }, []);
 
@@ -313,29 +412,17 @@ export default function App() {
         technicianProfile={currentTechnicianProfile}
         guestLocation={guestLocation}
         activeView={activeView}
-        canGoBack={activeView !== 'home' || Boolean(selectedTechnician || showTechRegistrationModal || showHelpModal)}
+        canGoBack={activeView !== 'home'}
         onBack={handleGoBack}
-        onNavigate={(view) => {
-          if (view === 'technician_dashboard' && !currentUser) {
-            setAuthInitialRole('technician');
-            setShowAuthModal(true);
-            return;
-          }
-          setActiveView(view);
-        }}
+        onNavigate={handleNavigateToView}
         onOpenAuth={() => {
           setAuthPromptMessage(undefined);
           setAuthInitialRole('customer');
+          pushNavHistory('auth');
           setShowAuthModal(true);
         }}
-        onOpenTechnicianRegistration={() => {
-          if (!currentUser) {
-            handleRequireAuth('register as a service provider', 'technician');
-          } else {
-            setShowTechRegistrationModal(true);
-          }
-        }}
-        onOpenHelpSupport={() => setShowHelpModal(true)}
+        onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
+        onOpenHelpSupport={handleOpenHelpSupport}
         onLogout={handleLogout}
         onUpdateCity={handleUpdateCity}
         onUpdateLocation={handleUpdateLocation}
@@ -350,11 +437,8 @@ export default function App() {
             customerLocation={currentUser?.location || guestLocation}
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
-            onSelectTechnician={(tech) => setSelectedTechnician(tech)}
-            onOpenTechnicianRegistration={() => {
-              if (!currentUser) handleRequireAuth('register as a service provider', 'technician');
-              else setShowTechRegistrationModal(true);
-            }}
+            onSelectTechnician={handleSelectTechnician}
+            onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
             onUpdateLocation={handleUpdateLocation}
             onRequireAuth={handleRequireAuth}
           />
@@ -363,7 +447,7 @@ export default function App() {
         {activeView === 'technician_dashboard' && currentTechnicianProfile && (
           <TechnicianDashboard
             technician={currentTechnicianProfile}
-            onOpenEditApplication={() => setShowTechRegistrationModal(true)}
+            onOpenEditApplication={handleOpenTechnicianRegistration}
           />
         )}
 
@@ -371,23 +455,17 @@ export default function App() {
           <AdminPanel
             currentUser={currentUser}
             onUserChange={setCurrentUser}
-            onExitAdmin={() => setActiveView('home')}
+            onExitAdmin={handleGoBack}
           />
         )}
       </main>
 
       {/* FOOTER */}
       <Footer
-        onOpenHelpModal={() => setShowHelpModal(true)}
-        onOpenNoticeModal={() => setShowImportantNoticeModal(true)}
-        onOpenAdmin={() => setActiveView('admin_panel')}
-        onOpenTechnicianRegistration={() => {
-          if (!currentUser) {
-            handleRequireAuth('register as a service provider', 'technician');
-          } else {
-            setShowTechRegistrationModal(true);
-          }
-        }}
+        onOpenHelpModal={handleOpenHelpSupport}
+        onOpenNoticeModal={handleOpenNoticeModal}
+        onOpenAdmin={() => handleNavigateToView('admin_panel')}
+        onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
       />
 
       {/* MODALS */}
@@ -395,7 +473,7 @@ export default function App() {
       {showAuthModal && (
         <UnifiedAuthModal
           isOpen={showAuthModal}
-          onClose={handleCloseAuthModal}
+          onClose={handleGoBack}
           onSuccess={handleAuthSuccess}
           onLoginSuccess={handleAuthSuccess}
           promptMessage={authPromptMessage}
@@ -415,7 +493,7 @@ export default function App() {
       {showTechRegistrationModal && currentUser && (
         <TechnicianRegistrationModal
           isOpen={showTechRegistrationModal}
-          onClose={() => setShowTechRegistrationModal(false)}
+          onClose={handleGoBack}
           currentUser={currentUser}
           onSubmitted={handleTechnicianSubmitted}
         />
@@ -429,7 +507,7 @@ export default function App() {
           userLocation={currentUser?.location}
           isFavorite={favorites.includes(selectedTechnician.id)}
           onToggleFavorite={handleToggleFavorite}
-          onClose={() => setSelectedTechnician(null)}
+          onClose={handleGoBack}
           onRequireAuth={handleRequireAuth}
         />
       )}
@@ -437,7 +515,7 @@ export default function App() {
       {/* 5. Help, Complaints & Support Modal */}
       <HelpSupportModal
         isOpen={showHelpModal}
-        onClose={() => setShowHelpModal(false)}
+        onClose={handleGoBack}
         userRole={currentUser?.role}
       />
 
@@ -445,7 +523,7 @@ export default function App() {
       <ImportantNoticeModal
         isOpen={showImportantNoticeModal}
         onAgree={handleAgreeImportantNotice}
-        onClose={() => setShowImportantNoticeModal(false)}
+        onClose={handleGoBack}
         userName={currentUser?.name}
       />
 

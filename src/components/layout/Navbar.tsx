@@ -96,24 +96,22 @@ export const Navbar: React.FC<NavbarProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/90 shadow-xs w-full">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4 w-full">
-        {/* Left: Top Bar Back Arrow + Brand Logo & Tagline */}
+        {/* Left: Top Bar Back Arrow (Only shown on inner views, removed from front page) + Brand Logo & Tagline */}
         <div className="flex items-center gap-2.5 sm:gap-4">
-          {/* Functional Top Bar Back Arrow (🔙 / ←) */}
-          <button
-            type="button"
-            id="top-bar-back-btn"
-            onClick={handleBackClick}
-            className={`p-2 sm:px-3 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-black shadow-xs active:scale-95 cursor-pointer shrink-0 ${
-              canGoBack || activeView !== 'home'
-                ? 'bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 shadow-blue-600/20'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-300/80 hover:text-blue-700'
-            }`}
-            title="Go back to previous screen (🔙 पिछली स्क्रीन पर वापस जाएं)"
-            aria-label="Back navigation"
-          >
-            <ArrowLeft size={18} className="stroke-[2.5] shrink-0" />
-            <span className="hidden sm:inline font-bold">Back</span>
-          </button>
+          {/* Functional Top Bar Back Arrow (🔙 / ←) - Hidden on front page */}
+          {activeView !== 'home' && (
+            <button
+              type="button"
+              id="top-bar-back-btn"
+              onClick={handleBackClick}
+              className="p-2 sm:px-3 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-black shadow-xs active:scale-95 cursor-pointer shrink-0 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 shadow-blue-600/20"
+              title="Go back to previous screen (🔙 पिछली स्क्रीन पर वापस जाएं)"
+              aria-label="Back navigation"
+            >
+              <ArrowLeft size={18} className="stroke-[2.5] shrink-0" />
+              <span className="hidden sm:inline font-bold">Back</span>
+            </button>
+          )}
 
           <div
             onClick={() => onNavigate('home')}

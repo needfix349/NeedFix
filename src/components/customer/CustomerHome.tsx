@@ -57,11 +57,8 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [verifiedOnly, setVerifiedOnly] = useState(false);
-  const [onlineOnly, setOnlineOnly] = useState(false);
   const [minRating, setMinRating] = useState<number>(0);
   const [maxDistanceKm, setMaxDistanceKm] = useState<number>(20);
-  const [sortBy, setSortBy] = useState<'distance' | 'rating'>('distance');
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
@@ -129,8 +126,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           if (!matchesCategory) return false;
         }
 
-        if (verifiedOnly && !tech.isVerified) return false;
-        if (onlineOnly && !tech.isOnline) return false;
         if (minRating > 0 && tech.rating < minRating) return false;
 
         // Search text matching
@@ -156,7 +151,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         return true;
       })
       .sort((a, b) => {
-        // Native GPS Proximity calculation: closest technician to customer's GPS is FIRST!
+        // Native GPS Proximity calculation: closest technician to customer's GPS is always FIRST!
         const distA = calculateDistanceKm(
           currentLocation.latitude,
           currentLocation.longitude,
@@ -170,10 +165,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           b.location.longitude
         );
 
-        if (sortBy === 'rating') {
-          return b.rating - a.rating;
-        }
-
         // Proximity priority: closest to current GPS comes first
         return distA - distB;
       });
@@ -181,10 +172,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     approvedTechnicians,
     selectedCategory,
     searchQuery,
-    verifiedOnly,
-    onlineOnly,
     minRating,
-    sortBy,
     showOnlyFavorites,
     favorites,
     currentLocation,
@@ -251,7 +239,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                 <div className="text-left min-w-0">
                   <div className="flex items-center gap-1.5">
                     <span className="truncate max-w-[130px] sm:max-w-[200px] text-xs font-bold text-white">
-                      {currentLocation.area ? `${currentLocation.area}, ${currentLocation.city}` : currentLocation.city}
+                      {currentLocation.city || 'Select City'}
                     </span>
                     {currentLocation.isGpsLocked ? (
                       <span className="text-[9px] bg-emerald-500/30 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-400/30 uppercase shrink-0 flex items-center gap-0.5">
@@ -259,12 +247,12 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                       </span>
                     ) : (
                       <span className="text-[9px] bg-blue-500/30 text-blue-200 px-1.5 py-0.5 rounded font-bold border border-blue-400/30 uppercase shrink-0">
-                        City Pin
+                        {currentLocation.state || 'Set Location'}
                       </span>
                     )}
                   </div>
-                  <span className="text-[10px] text-blue-200/80 font-mono block truncate">
-                    {currentLocation.address || `${currentLocation.latitude.toFixed(4)}°, ${currentLocation.longitude.toFixed(4)}°`}
+                  <span className="text-[10px] text-blue-200/90 block truncate">
+                    {currentLocation.state ? `${currentLocation.city}, ${currentLocation.state}` : 'Tap to select State & District'}
                   </span>
                 </div>
               </div>
@@ -307,27 +295,10 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                 onClick={() => setShowLocationModal(true)}
                 className="text-[11px] font-bold underline text-white hover:text-amber-200 shrink-0 cursor-pointer"
               >
-                Choose City
+                Choose Location
               </button>
             </div>
           )}
-
-          {/* Pan-India 28 States Bar */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/15 text-[11px]">
-            <div className="flex items-center gap-1.5 text-blue-100">
-              <span className="text-sm">🇮🇳</span>
-              <span className="font-bold">Total 28 States Covered</span>
-              <span className="text-blue-200/80 hidden sm:inline">(भारत के सभी 28 राज्य और 8 केंद्र शासित प्रदेश)</span>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowLocationModal(true)}
-              className="text-[11px] font-bold text-amber-300 hover:text-amber-200 underline decoration-amber-300/60 underline-offset-2 flex items-center gap-1 cursor-pointer transition-colors"
-            >
-              <span>Browse All 28 States & Cities</span>
-              <span>→</span>
-            </button>
-          </div>
         </div>
       </div>
 
@@ -380,37 +351,11 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
       </div>
 
-      {/* FILTER & SORT TOOLBAR */}
+      {/* FILTER & COVERAGE TOOLBAR */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           {/* Filter Pills */}
           <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setVerifiedOnly(!verifiedOnly)}
-              className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                verifiedOnly
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-              }`}
-            >
-              <ShieldCheck size={14} />
-              <span>Verified Only</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setOnlineOnly(!onlineOnly)}
-              className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                onlineOnly
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-              }`}
-            >
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Online Now</span>
-            </button>
-
             <button
               type="button"
               onClick={() => setMinRating(minRating === 4.5 ? 0 : 4.5)}
@@ -438,88 +383,73 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             </button>
           </div>
 
-          {/* Distance & Sorting */}
-          <div className="flex flex-wrap items-center gap-3">
-            {/* Dynamic Distance Coverage Slider (1km to 20km) */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl px-3 py-1.5 shadow-2xs">
-              <div className="flex items-center gap-1.5">
-                <span className="text-[11px] font-bold text-slate-700">Radius:</span>
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => setMaxDistanceKm((prev) => Math.max(1, prev - 1))}
-                    disabled={maxDistanceKm <= 1}
-                    className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
-                    title="Decrease 1 km"
-                  >
-                    <Minus size={11} />
-                  </button>
-                  <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-lg border border-blue-200 min-w-[44px] text-center">
-                    {maxDistanceKm} km
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setMaxDistanceKm((prev) => Math.min(20, prev + 1))}
-                    disabled={maxDistanceKm >= 20}
-                    className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
-                    title="Increase 1 km"
-                  >
-                    <Plus size={11} />
-                  </button>
-                </div>
-              </div>
-
-              {/* Smooth Custom Slider (1 - 20 km) with onInput and dynamic fill */}
-              <input
-                type="range"
-                min={1}
-                max={20}
-                step={1}
-                value={maxDistanceKm}
-                onInput={(e) => {
-                  const val = parseInt((e.target as HTMLInputElement).value, 10);
-                  if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
-                }}
-                onChange={(e) => {
-                  const val = parseInt(e.target.value, 10);
-                  if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
-                }}
-                className="w-20 sm:w-28 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 touch-none"
-                style={{
-                  background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 100%)`,
-                }}
-                title={`Coverage Radius: ${maxDistanceKm} km`}
-              />
-
-              {/* Quick Preset Chips */}
-              <div className="hidden sm:flex items-center gap-1">
-                {[1, 3, 5, 10, 15, 20].map((step) => (
-                  <button
-                    key={step}
-                    type="button"
-                    onClick={() => setMaxDistanceKm(step)}
-                    className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                      maxDistanceKm === step
-                        ? 'bg-blue-600 text-white shadow-2xs scale-105'
-                        : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
-                    }`}
-                  >
-                    {step}k
-                  </button>
-                ))}
+          {/* Dynamic Distance Coverage Slider (1km to 20km) */}
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl px-3 py-1.5 shadow-2xs">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[11px] font-bold text-slate-700">Radius:</span>
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  onClick={() => setMaxDistanceKm((prev) => Math.max(1, prev - 1))}
+                  disabled={maxDistanceKm <= 1}
+                  className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
+                  title="Decrease 1 km"
+                >
+                  <Minus size={11} />
+                </button>
+                <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-lg border border-blue-200 min-w-[44px] text-center">
+                  {maxDistanceKm} km
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setMaxDistanceKm((prev) => Math.min(20, prev + 1))}
+                  disabled={maxDistanceKm >= 20}
+                  className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
+                  title="Increase 1 km"
+                >
+                  <Plus size={11} />
+                </button>
               </div>
             </div>
 
-            <div className="flex items-center gap-1.5 text-xs text-slate-600 font-medium">
-              <span>Sort:</span>
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'distance' | 'rating')}
-                className="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none cursor-pointer"
-              >
-                <option value="distance">Nearest (GPS Distance)</option>
-                <option value="rating">Top Rated (⭐)</option>
-              </select>
+            {/* Smooth Custom Slider (1 - 20 km) with onInput and dynamic fill */}
+            <input
+              type="range"
+              min={1}
+              max={20}
+              step={1}
+              value={maxDistanceKm}
+              onInput={(e) => {
+                const val = parseInt((e.target as HTMLInputElement).value, 10);
+                if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
+              }}
+              onChange={(e) => {
+                const val = parseInt(e.target.value, 10);
+                if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
+              }}
+              className="w-20 sm:w-28 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 touch-none"
+              style={{
+                background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 100%)`,
+              }}
+              title={`Coverage Radius: ${maxDistanceKm} km`}
+            />
+
+            {/* Quick Preset Chips */}
+            <div className="hidden sm:flex items-center gap-1">
+              {[1, 3, 5, 10, 15, 20].map((step) => (
+                <button
+                  key={step}
+                  type="button"
+                  onClick={() => setMaxDistanceKm(step)}
+                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                    maxDistanceKm === step
+                      ? 'bg-blue-600 text-white shadow-2xs scale-105'
+                      : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
+                  }`}
+                >
+                  {step}k
+                </button>
+              ))}
             </div>
           </div>
         </div>
@@ -567,8 +497,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                   setMaxDistanceKm(20);
                   setSelectedCategory('all');
                   setSearchQuery('');
-                  setVerifiedOnly(false);
-                  setOnlineOnly(false);
                   setMinRating(0);
                 }}
                 className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"

@@ -296,10 +296,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       setErrorMessage('Aadhaar Back Side photo is required. Please launch guided camera or upload from gallery.');
       return;
     }
-    if (!companyLogoUrl || !companyLogoUrl.trim()) {
-      setErrorMessage('Please upload a store or company logo photo.');
-      return;
-    }
+    // Company / store logo is optional per user preference
     if (!hasAgreedTerms) {
       setErrorMessage('Please accept the verification terms to proceed.');
       return;
@@ -388,8 +385,12 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         `${companyName} offers expert services for ${categoryNames.join(
           ', '
         )} with verified tools, genuine parts, and satisfaction guarantee.`,
-      profilePhotoUrl: companyLogoUrl.trim(),
-      companyLogoUrl: companyLogoUrl.trim(),
+      profilePhotoUrl:
+        companyLogoUrl.trim() ||
+        'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
+      companyLogoUrl:
+        companyLogoUrl.trim() ||
+        'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
       portfolioImages: [],
       documents: {
         aadhaarNumber: cleanAadhaar,
@@ -844,7 +845,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Store / Shop Photo or Logo <span className="text-red-500">*</span>
+                    Store / Shop Photo or Logo <span className="text-slate-500 font-semibold text-[11px] normal-case tracking-normal">(Optional / ऐच्छिक)</span>
                   </label>
                   <span className="text-[11px] text-blue-700 font-semibold">Upload from Gallery or Camera</span>
                 </div>
