@@ -55,16 +55,16 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({ user, onComple
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
-          {/* Full Name */}
+          {/* Name */}
           <div>
             <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5">
-              Full Name <span className="text-red-500">*</span>
+              Name <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center rounded-2xl border border-slate-300 focus-within:border-blue-600 focus-within:ring-3 focus-within:ring-blue-100 transition-all bg-slate-50/50 px-3.5 py-2.5">
               <User size={18} className="text-slate-400 mr-2.5 shrink-0" />
               <input
                 type="text"
-                placeholder="e.g. Ramesh Sharma"
+                placeholder="e.g. Alex"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full bg-transparent outline-none text-sm text-slate-900 font-medium placeholder:text-slate-400"

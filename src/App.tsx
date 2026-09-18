@@ -56,21 +56,9 @@ export default function App() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<DeviceSecurityStatus | null>(null);
 
-  // Universal IP & Device Security Verification & Visitor Tracking
+  // Device Security Verification without IP/fingerprint syncing on login
   const runDeviceSecurityVerification = async () => {
-    try {
-      const sec = await deviceSecurityService.checkDeviceBlocked();
-      setSecurityStatus(sec);
-      if (!sec.isBlocked) {
-        const activeUser = storageService.getCurrentUser();
-        await deviceSecurityService.trackCustomerEntry(
-          activeUser?.name,
-          activeUser?.mobile
-        );
-      }
-    } catch (e) {
-      console.warn('Security check error:', e);
-    }
+    // Removed IP address & device fingerprint sync system on login
   };
 
   // Ref to always track current navigation & modal state for popstate handler
@@ -426,6 +414,7 @@ export default function App() {
         onLogout={handleLogout}
         onUpdateCity={handleUpdateCity}
         onUpdateLocation={handleUpdateLocation}
+        onUpdateUser={(updated) => setCurrentUser(updated)}
       />
 
       {/* Main View Router */}

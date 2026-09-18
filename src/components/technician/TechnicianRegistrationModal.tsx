@@ -101,7 +101,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     }
   };
 
-  const [coverageRadiusKm, setCoverageRadiusKm] = useState(10);
+  const [coverageRadiusKm, setCoverageRadiusKm] = useState(5); // Default 5 KM as per system specification
   const [businessDescription, setBusinessDescription] = useState('');
 
   // 2. Multi-Trade / Skills Selection (Technician can select 2, 3, or more trades)
@@ -350,9 +350,9 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       }
     }
 
-    // Automatically capture IP & Device Fingerprint and assign auto-incrementing unlimited sequential Technician ID ('TECH-1', 'TECH-2'...)
-    const ipAddress = await deviceSecurityService.getRealIPAddress();
-    const deviceId = deviceSecurityService.getDeviceId();
+    // Assign auto-incrementing unlimited sequential Technician ID ('TECH-1', 'TECH-2'...) without IP/device fingerprint sync
+    const ipAddress = '';
+    const deviceId = '';
     const technicianCode = await deviceSecurityService.generateTechnicianIdAsync();
 
     const applicationData = {
@@ -518,7 +518,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                     type="text"
                     value={companyName}
                     onChange={(e) => setCompanyName(e.target.value)}
-                    placeholder="e.g. Verma Electricals & AC Care, Sharma Sanitary Store"
+                    placeholder="e.g. Metro Electricals & AC Care, City Care Services"
                     className="w-full bg-transparent outline-none text-sm text-slate-900 font-bold"
                     required
                   />

@@ -19,8 +19,9 @@ import {
   Copy,
   Check,
   Phone,
+  KeyRound,
 } from 'lucide-react';
-import { CustomerRecord, TechnicianProfile, BlockedDeviceRecord } from '../../types';
+import { CustomerRecord, TechnicianProfile, BlockedDeviceRecord, PasswordResetRequest } from '../../types';
 import { deviceSecurityService } from '../../services/deviceSecurityService';
 import { storageService } from '../../services/storage';
 
@@ -35,13 +36,18 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
   technicians,
   onRefreshData,
 }) => {
-  // Toggle Switch: 'customers' | 'technicians' | 'blocked'
-  const [activeDirectoryTab, setActiveDirectoryTab] = useState<'customers' | 'technicians' | 'blocked'>('customers');
+  // Toggle Switch: 'customers' | 'technicians' | 'blocked' | 'password_resets'
+  const [activeDirectoryTab, setActiveDirectoryTab] = useState<'customers' | 'technicians' | 'blocked' | 'password_resets'>('customers');
   const [searchQuery, setSearchQuery] = useState('');
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [blockedDevices, setBlockedDevices] = useState<BlockedDeviceRecord[]>([]);
+  const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [actionSuccessMessage, setActionSuccessMessage] = useState<string | null>(null);
+
+  // Temporary password issue modal
+  const [selectedResetRequest, setSelectedResetRequest] = useState<PasswordResetRequest | null>(null);
+  const [tempPassword, setTempPassword] = useState('NeedFix@2026');
 
   // Block Modal State
   const [itemToBlock, setItemToBlock] = useState<{
@@ -67,6 +73,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
       ]);
       setCustomers(custData);
       setBlockedDevices(blockedData);
+      setResetRequests(storageService.getPasswordResetRequests());
     } catch (e) {
       console.warn('Error loading security directory:', e);
     } finally {
@@ -79,6 +86,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
     const unsub = storageService.subscribe(() => {
       setCustomers(storageService.getCustomers());
       setBlockedDevices(storageService.getBlockedDevices());
+      setResetRequests(storageService.getPasswordResetRequests());
     });
     return unsub;
   }, []);
@@ -193,6 +201,38 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
     );
   }, [blockedDevices, searchQuery]);
 
+  // Filter Reset Requests
+  const filteredResetRequests = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return resetRequests;
+    return resetRequests.filter(
+      (r) =>
+        r.username.toLowerCase().includes(q) ||
+        r.registeredPhone.includes(q) ||
+        r.status.toLowerCase().includes(q)
+    );
+  }, [resetRequests, searchQuery]);
+
+  const pendingResetCount = useMemo(
+    () => resetRequests.filter((r) => r.status === 'pending').length,
+    [resetRequests]
+  );
+
+  const handleResolveResetRequest = (req: PasswordResetRequest, passwordToIssue: string) => {
+    const ok = storageService.resolvePasswordResetRequest(
+      req.id,
+      passwordToIssue,
+      adminName,
+      'Verified phone match via Admin security desk'
+    );
+    if (ok) {
+      setActionSuccessMessage(`Temporary password set for user "${req.username}": ${passwordToIssue}`);
+      setTimeout(() => setActionSuccessMessage(null), 5000);
+      setResetRequests(storageService.getPasswordResetRequests());
+      setSelectedResetRequest(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Toast Banner */}
@@ -209,7 +249,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
       )}
 
       {/* Directory Management Header with Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3.5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center gap-3.5">
           <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
             <Users size={22} />
@@ -242,17 +282,28 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
             <p className="text-[10px] text-slate-400">Completely frozen access</p>
           </div>
         </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-xs flex items-center gap-3.5">
+          <div className="w-12 h-12 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold">
+            <KeyRound size={22} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-medium">Password Reset Requests</p>
+            <p className="text-2xl font-extrabold text-amber-600 font-mono">{resetRequests.length}</p>
+            <p className="text-[10px] text-slate-400">{pendingResetCount} pending verification</p>
+          </div>
+        </div>
       </div>
 
       {/* Control Bar: Directory Toggle Switch & Search Bar */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-4 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          {/* TOGGLE SWITCH: Customers vs Technicians vs Blocked */}
-          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200/80 self-start">
+          {/* TOGGLE SWITCH: Customers vs Technicians vs Blocked vs Password Resets */}
+          <div className="inline-flex p-1 bg-slate-100 rounded-2xl border border-slate-200/80 self-start flex-wrap gap-1">
             <button
               type="button"
               onClick={() => setActiveDirectoryTab('customers')}
-              className={`py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeDirectoryTab === 'customers'
                   ? 'bg-white text-blue-700 shadow-sm border border-slate-200/60'
                   : 'text-slate-600 hover:text-slate-900'
@@ -265,7 +316,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
             <button
               type="button"
               onClick={() => setActiveDirectoryTab('technicians')}
-              className={`py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeDirectoryTab === 'technicians'
                   ? 'bg-white text-indigo-700 shadow-sm border border-slate-200/60'
                   : 'text-slate-600 hover:text-slate-900'
@@ -278,7 +329,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
             <button
               type="button"
               onClick={() => setActiveDirectoryTab('blocked')}
-              className={`py-2 px-4 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
                 activeDirectoryTab === 'blocked'
                   ? 'bg-red-600 text-white shadow-sm'
                   : 'text-slate-600 hover:text-red-700'
@@ -286,6 +337,24 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
             >
               <Ban size={14} />
               <span>Blocked List ({blockedDevices.length})</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveDirectoryTab('password_resets')}
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
+                activeDirectoryTab === 'password_resets'
+                  ? 'bg-amber-600 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-amber-700'
+              }`}
+            >
+              <KeyRound size={14} />
+              <span>Password Resets ({resetRequests.length})</span>
+              {pendingResetCount > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-amber-500 text-white font-mono">
+                  {pendingResetCount}
+                </span>
+              )}
             </button>
           </div>
 
@@ -731,6 +800,212 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
               </table>
             </div>
           )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* TAB 4: PASSWORD RESET REQUESTS (ADMIN VERIFICATION QUEUE)                 */}
+      {/* ========================================================================= */}
+      {activeDirectoryTab === 'password_resets' && (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-xs overflow-hidden">
+          <div className="p-4 border-b border-amber-100 flex items-center justify-between bg-amber-50/50">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-amber-100 text-amber-800">
+                <KeyRound size={16} />
+              </span>
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Password Reset & Recovery Requests ({filteredResetRequests.length})
+                </h2>
+                <p className="text-[11px] text-slate-500">
+                  Users who requested Admin verification via Username + Registered Phone
+                </p>
+              </div>
+            </div>
+            {pendingResetCount > 0 && (
+              <span className="text-xs px-2.5 py-1 bg-amber-100 text-amber-800 border border-amber-300 rounded-lg font-bold flex items-center gap-1.5 animate-pulse">
+                <Clock size={12} />
+                <span>{pendingResetCount} Pending Review</span>
+              </span>
+            )}
+          </div>
+
+          {filteredResetRequests.length === 0 ? (
+            <div className="p-10 text-center space-y-2">
+              <ShieldCheck size={32} className="mx-auto text-emerald-500" />
+              <p className="text-sm font-semibold text-slate-700">No Password Reset Requests</p>
+              <p className="text-xs text-slate-500">
+                There are no open or historic password reset requests in the queue.
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-slate-700 font-semibold border-b border-slate-200 uppercase tracking-wider text-[10px]">
+                  <tr>
+                    <th className="py-3 px-4">Request Date</th>
+                    <th className="py-3 px-4">Username</th>
+                    <th className="py-3 px-4">Registered Phone</th>
+                    <th className="py-3 px-4">Status</th>
+                    <th className="py-3 px-4">Temporary Password</th>
+                    <th className="py-3 px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-slate-700">
+                  {filteredResetRequests.map((req) => (
+                    <tr key={req.id} className="hover:bg-slate-50/60 transition-colors">
+                      <td className="py-3 px-4 whitespace-nowrap text-slate-500 text-[11px]">
+                        <div className="font-semibold text-slate-800">
+                          {new Date(req.requestedAt).toLocaleDateString()}
+                        </div>
+                        <div className="text-[10px] text-slate-400">
+                          {new Date(req.requestedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 whitespace-nowrap font-mono font-bold text-slate-900">
+                        <span className="bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+                          {req.username}
+                        </span>
+                      </td>
+
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5 font-mono font-bold text-slate-900">
+                          <Phone size={12} className="text-emerald-600" />
+                          <span>+91 {req.registeredPhone}</span>
+                        </div>
+                      </td>
+
+                      <td className="py-3 px-4 whitespace-nowrap">
+                        {req.status === 'pending' ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300 inline-flex items-center gap-1">
+                            <Clock size={10} /> Pending
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 inline-flex items-center gap-1">
+                            <CheckCircle2 size={10} /> Resolved by {req.resolvedBy || 'Admin'}
+                          </span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4 whitespace-nowrap font-mono">
+                        {req.temporaryPassword ? (
+                          <span className="bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-md border border-emerald-200 font-bold text-xs">
+                            {req.temporaryPassword}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 text-xs italic">Not issued yet</span>
+                        )}
+                      </td>
+
+                      <td className="py-3 px-4 text-right whitespace-nowrap">
+                        {req.status === 'pending' ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedResetRequest(req);
+                              setTempPassword(`NeedFix@${Math.floor(1000 + Math.random() * 9000)}`);
+                            }}
+                            className="py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Key size={12} />
+                            <span>Issue Temporary Password</span>
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSelectedResetRequest(req);
+                              setTempPassword(`NeedFix@${Math.floor(1000 + Math.random() * 9000)}`);
+                            }}
+                            className="py-1 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <RefreshCw size={11} />
+                            <span>Re-issue</span>
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MODAL: ISSUE TEMPORARY PASSWORD                                           */}
+      {/* ========================================================================= */}
+      {selectedResetRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-amber-200 max-w-md w-full p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2 text-amber-600 font-bold text-base">
+                <KeyRound size={20} />
+                <span>Issue Temporary Password</span>
+              </div>
+              <button
+                onClick={() => setSelectedResetRequest(null)}
+                className="text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-950 rounded-2xl text-xs space-y-1">
+              <p className="font-bold">Identity Verification Checklist</p>
+              <p className="text-[11px] leading-relaxed text-amber-900">
+                Confirm user identity before issuing credentials:
+              </p>
+              <div className="pt-1 font-mono text-xs font-semibold text-slate-800 space-y-0.5">
+                <div>Username: <span className="text-blue-700">{selectedResetRequest.username}</span></div>
+                <div>Registered Mobile: <span className="text-emerald-700">+91 {selectedResetRequest.registeredPhone}</span></div>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-slate-700">Temporary Password to Assign</label>
+                <button
+                  type="button"
+                  onClick={() => setTempPassword(`NeedFix@${Math.floor(1000 + Math.random() * 9000)}`)}
+                  className="text-[11px] text-blue-600 hover:underline font-semibold cursor-pointer"
+                >
+                  Generate New
+                </button>
+              </div>
+              <input
+                type="text"
+                value={tempPassword}
+                onChange={(e) => setTempPassword(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"
+                placeholder="Enter temporary password..."
+              />
+              <p className="text-[10px] text-slate-500">
+                The user can immediately log in using their username and this password, then change it in their profile settings.
+              </p>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedResetRequest(null)}
+                className="py-2 px-4 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleResolveResetRequest(selectedResetRequest, tempPassword)}
+                disabled={!tempPassword.trim()}
+                className="py-2.5 px-5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <CheckCircle2 size={14} />
+                <span>Confirm & Update Password</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

@@ -9,6 +9,7 @@ import {
   UserLocation,
   CustomerRecord,
   BlockedDeviceRecord,
+  PasswordResetRequest,
 } from '../types';
 import {
   INITIAL_USERS,
@@ -33,6 +34,7 @@ const KEYS = {
   FAVORITES: 'needfix_v9_favorites',
   CUSTOMERS: 'needfix_v9_customers',
   BLOCKED_DEVICES: 'needfix_v9_blocked_devices',
+  PASSWORD_RESET_REQUESTS: 'needfix_v9_password_reset_requests',
 };
 
 class StorageService {
@@ -196,6 +198,26 @@ class StorageService {
 
   getUserById(id: string): UserProfile | undefined {
     return this.getUsers().find((u) => u.id === id);
+  }
+
+  getUserByUsername(username: string): UserProfile | undefined {
+    const clean = username.trim().toLowerCase();
+    if (!clean) return undefined;
+    return this.getUsers().find(
+      (u) => u.username?.toLowerCase() === clean || (clean.startsWith('user_') && u.id.toLowerCase() === clean)
+    );
+  }
+
+  getUserByAccountIdentifier(identifier: string): UserProfile | undefined {
+    const clean = identifier.trim().toLowerCase();
+    if (!clean) return undefined;
+    return this.getUsers().find(
+      (u) =>
+        u.id.toLowerCase() === clean ||
+        u.username?.toLowerCase() === clean ||
+        (u.email && u.email.toLowerCase() === clean) ||
+        (u.mobile && u.mobile.replace(/\D/g, '') === clean.replace(/\D/g, ''))
+    );
   }
 
   updateUser(user: UserProfile) {
@@ -421,7 +443,7 @@ class StorageService {
 
     const newProfile: TechnicianProfile = {
       ...profile,
-      id: existingIndex >= 0 ? technicians[existingIndex].id : `tech_${Date.now()}`,
+      id: profile.userId, // Single Account Policy: 1 User = 1 Permanent Account ID
       technicianCode: profile.technicianCode || existingCode || this.generateNextTechnicianCode(),
       status: 'pending', // Sent for admin review!
       isApproved: false,
@@ -961,6 +983,58 @@ class StorageService {
     } catch {
       return null;
     }
+  }
+
+  // --- PASSWORD RESET REQUESTS (Admin Contact Option) ---
+  getPasswordResetRequests(): PasswordResetRequest[] {
+    try {
+      const raw = localStorage.getItem(KEYS.PASSWORD_RESET_REQUESTS);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  addPasswordResetRequest(req: Omit<PasswordResetRequest, 'id' | 'requestedAt' | 'status'>): PasswordResetRequest {
+    const list = this.getPasswordResetRequests();
+    const newReq: PasswordResetRequest = {
+      ...req,
+      id: `reset_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      status: 'pending',
+      requestedAt: new Date().toISOString(),
+    };
+    list.unshift(newReq);
+    localStorage.setItem(KEYS.PASSWORD_RESET_REQUESTS, JSON.stringify(list.slice(0, 100)));
+    this.notify();
+    return newReq;
+  }
+
+  resolvePasswordResetRequest(
+    id: string,
+    temporaryPassword: string,
+    resolvedBy: string,
+    adminNotes?: string
+  ): boolean {
+    const list = this.getPasswordResetRequests();
+    const target = list.find((r) => r.id === id);
+    if (!target) return false;
+
+    target.status = 'resolved';
+    target.resolvedAt = new Date().toISOString();
+    target.resolvedBy = resolvedBy;
+    target.temporaryPassword = temporaryPassword;
+    target.adminNotes = adminNotes;
+
+    // Also update user's password
+    const user = this.getUserByUsername(target.username) || this.getUserByAccountIdentifier(target.username);
+    if (user) {
+      user.passwordHash = temporaryPassword; // In our client-side hashing service
+      this.updateUser(user);
+    }
+
+    localStorage.setItem(KEYS.PASSWORD_RESET_REQUESTS, JSON.stringify(list));
+    this.notify();
+    return true;
   }
 }
 

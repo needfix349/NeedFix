@@ -22,8 +22,29 @@ export interface UserLocation {
   accuracyMeters?: number;
 }
 
+export interface SecurityQuestionConfig {
+  question1: string;
+  answer1Hash: string;
+  question2: string;
+  answer2Hash: string;
+}
+
+export interface PasswordResetRequest {
+  id: string;
+  username: string;
+  phone: string;
+  status: 'pending' | 'resolved' | 'rejected';
+  requestedAt: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  temporaryPassword?: string;
+  adminNotes?: string;
+}
+
 export interface UserProfile {
   id: string;
+  username?: string;
+  passwordHash?: string;
   name: string;
   mobile: string;
   countryCode: string;
@@ -42,6 +63,13 @@ export interface UserProfile {
   aadhaar_back_url?: string;
   full_name_aadhaar?: string;
   dob?: string;
+  installationId?: string;
+  securityPinHash?: string; // Encrypted/hashed 4-digit numeric PIN for instant password recovery
+  searchRadiusKm?: number; // Service and search geofenced radius in KM (Default: 5 KM)
+  securityQuestions?: SecurityQuestionConfig;
+  isBlocked?: boolean;
+  blockedReason?: string;
+  blockedAt?: string;
 }
 
 export interface ServiceCategory {

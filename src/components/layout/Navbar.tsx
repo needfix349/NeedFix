@@ -27,6 +27,7 @@ import { getCurrentGPSLocation } from '../../services/locationService';
 import { NeedFixAppIcon } from '../common/NeedFixAppIcon';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
+import { EditProfileModal } from '../common/EditProfileModal';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -42,6 +43,7 @@ interface NavbarProps {
   onLogout: () => void;
   onUpdateCity?: (cityName: string) => void;
   onUpdateLocation?: (location: UserLocation) => void;
+  onUpdateUser?: (updatedUser: UserProfile) => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -58,8 +60,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   onLogout,
   onUpdateCity,
   onUpdateLocation,
+  onUpdateUser,
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [isLocatingGPS, setIsLocatingGPS] = useState(false);
   const [gpsNotification, setGpsNotification] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -315,11 +319,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <div className="space-y-1 text-xs font-semibold text-slate-700">
                       <button
                         type="button"
+                        id="navbar-change-name-btn"
                         onClick={() => {
-                          onOpenAuth();
                           setShowProfileMenu(false);
+                          setShowEditProfileModal(true);
                         }}
-                        className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700"
+                        className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700 cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2">
                           <User size={14} className="text-blue-600" />
@@ -446,6 +451,19 @@ export const Navbar: React.FC<NavbarProps> = ({
             }
             setGpsNotification(`${loc.area || loc.city}`);
             setTimeout(() => setGpsNotification(null), 3500);
+          }}
+        />
+      )}
+
+      {showEditProfileModal && currentUser && (
+        <EditProfileModal
+          isOpen={showEditProfileModal}
+          onClose={() => setShowEditProfileModal(false)}
+          currentUser={currentUser}
+          onUserUpdated={(updated) => {
+            if (onUpdateUser) {
+              onUpdateUser(updated);
+            }
           }}
         />
       )}

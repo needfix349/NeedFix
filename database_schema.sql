@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.technicians (
     category_name TEXT,
     category_ids TEXT[],
     experience_years NUMERIC DEFAULT 5,
-    coverage_radius_km NUMERIC DEFAULT 10,
+    coverage_radius_km NUMERIC DEFAULT 5,
     inspection_fee NUMERIC DEFAULT 299,
     starting_price NUMERIC DEFAULT 299,
     aadhaar_number TEXT,

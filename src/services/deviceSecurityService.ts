@@ -8,58 +8,57 @@ class DeviceSecurityService {
   private ipFetchPromise: Promise<string> | null = null;
 
   /**
-   * 1. Get or generate persistent unique Device Fingerprint ('DEV-XXXX-XXXX')
+   * Helper to generate standard RFC 4122 compliant UUID v4
+   */
+  generateUUID(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      try {
+        return crypto.randomUUID();
+      } catch {
+        // Fallback
+      }
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  }
+
+  /**
+   * 1. Get or generate persistent unique Privacy-Safe Installation ID (UUID v4)
+   * Strictly compliant with Google Play Store & Apple App Store Privacy Policies:
+   * NO hardware tracking (IMEI, MAC, SIM Serial, or hardware fingerprints).
    */
   getDeviceId(): string {
     if (this.cachedDeviceId) return this.cachedDeviceId;
 
     try {
-      const stored = localStorage.getItem('needfix_device_fingerprint_id');
-      if (stored && stored.startsWith('DEV-')) {
+      const stored = localStorage.getItem('needfix_installation_uuid');
+      if (stored && /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(stored)) {
         this.cachedDeviceId = stored;
         return stored;
+      }
+      // Migrate from old DEV- prefix if present but convert to privacy-safe UUID
+      const oldLegacy = localStorage.getItem('needfix_device_fingerprint_id');
+      if (oldLegacy) {
+        localStorage.removeItem('needfix_device_fingerprint_id');
       }
     } catch {
       // Ignore localStorage access issues
     }
 
-    // Generate deterministic hardware & browser characteristics hash
-    let hash = 0;
-    try {
-      const nav = window.navigator || ({} as any);
-      const scr = window.screen || ({} as any);
-      const fingerprintInput = [
-        nav.userAgent || '',
-        nav.language || '',
-        nav.platform || '',
-        nav.hardwareConcurrency || '',
-        scr.width || 0,
-        scr.height || 0,
-        scr.colorDepth || 0,
-        new Intl.DateTimeFormat().resolvedOptions().timeZone || '',
-      ].join('###');
-
-      for (let i = 0; i < fingerprintInput.length; i++) {
-        const char = fingerprintInput.charCodeAt(i);
-        hash = (hash << 5) - hash + char;
-        hash |= 0;
-      }
-    } catch {
-      hash = Math.floor(Math.random() * 1000000);
-    }
-
-    const hex1 = Math.abs(hash).toString(16).padStart(4, '0').slice(-4).toUpperCase();
-    const hex2 = Math.floor(1000 + Math.random() * 9000).toString(16).padStart(4, '0').slice(-4).toUpperCase();
-    const newDeviceId = `DEV-${hex1}-${hex2}`;
+    // Generate privacy-safe UUID v4
+    const newInstallationId = this.generateUUID();
 
     try {
-      localStorage.setItem('needfix_device_fingerprint_id', newDeviceId);
+      localStorage.setItem('needfix_installation_uuid', newInstallationId);
     } catch {
       // Ignore
     }
 
-    this.cachedDeviceId = newDeviceId;
-    return newDeviceId;
+    this.cachedDeviceId = newInstallationId;
+    return newInstallationId;
   }
 
   /**

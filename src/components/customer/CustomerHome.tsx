@@ -16,8 +16,6 @@ import {
   Calendar,
   Lock,
   Phone,
-  Minus,
-  Plus,
   AlertCircle,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, UserProfile } from '../../types';
@@ -31,6 +29,7 @@ import {
 import { CategoryLogo } from '../common/CategoryLogo';
 import { TechnicianCard } from './TechnicianCard';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
+import { accountService } from '../../services/accountService';
 
 interface CustomerHomeProps {
   technicians: TechnicianProfile[];
@@ -58,12 +57,33 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [minRating, setMinRating] = useState<number>(0);
-  const [maxDistanceKm, setMaxDistanceKm] = useState<number>(20);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
   const [isDetectingGps, setIsDetectingGps] = useState(false);
   const [gpsSuccess, setGpsSuccess] = useState(false);
   const [gpsErrorMsg, setGpsErrorMsg] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+
+  // Default Location Radius: 5 KM by default for newly registered and active users
+  const [searchRadiusKm, setSearchRadiusKm] = useState<number>(() => {
+    if (currentUser?.searchRadiusKm && currentUser.searchRadiusKm >= 1) {
+      return currentUser.searchRadiusKm;
+    }
+    return 5;
+  });
+
+  React.useEffect(() => {
+    if (currentUser?.searchRadiusKm && currentUser.searchRadiusKm >= 1) {
+      setSearchRadiusKm(currentUser.searchRadiusKm);
+    }
+  }, [currentUser?.searchRadiusKm]);
+
+  const handleRadiusChange = (newRadius: number) => {
+    const safeRadius = Math.max(1, Math.min(20, newRadius));
+    setSearchRadiusKm(safeRadius);
+    if (currentUser?.id) {
+      accountService.updateUserSearchRadius(currentUser.id, safeRadius);
+    }
+  };
 
   const currentLocation = customerLocation || currentUser?.location || DEFAULT_USER_LOCATION;
 
@@ -128,6 +148,18 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
 
         if (minRating > 0 && tech.rating < minRating) return false;
 
+        // Geofenced Radius Filtering: Display ONLY active and approved technicians who fall within the set radius (default 5 KM or user-adjusted distance)
+        const distanceKm = calculateDistanceKm(
+          currentLocation.latitude,
+          currentLocation.longitude,
+          tech.location.latitude,
+          tech.location.longitude
+        );
+
+        if (distanceKm > searchRadiusKm) {
+          return false;
+        }
+
         // Search text matching
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
@@ -176,6 +208,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     showOnlyFavorites,
     favorites,
     currentLocation,
+    searchRadiusKm,
   ]);
 
   const activeCategoryObj = SERVICE_CATEGORIES.find((c) => c.id === selectedCategory);
@@ -302,29 +335,126 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
       </div>
 
-      {/* OFFICIAL SERVICE CATEGORIES CAROUSEL/GRID */}
-      <div className="space-y-3">
-        <div className="flex items-center justify-between">
+      {/* OFFICIAL SERVICE CATEGORIES & RADIUS SELECTOR */}
+      <div className="space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
           <div>
-            <h2 className="text-base font-bold font-display text-slate-900">
-              Explore {SERVICE_CATEGORIES.length} Service Categories
+            <h2 className="text-base font-bold font-display text-slate-900 flex items-center gap-2">
+              <span>Explore {SERVICE_CATEGORIES.length} Service Categories</span>
+              <span className="text-[11px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200">
+                25 Trades
+              </span>
             </h2>
             <p className="text-xs text-slate-500">
-              Pick a trade to browse verified specialists in your coverage area ({SERVICE_CATEGORIES.length} Verified Trades)
+              Select any trade to see verified specialists active within your {searchRadiusKm} KM radius
             </p>
           </div>
           {selectedCategory !== 'all' && (
             <button
               onClick={() => setSelectedCategory('all')}
-              className="text-xs font-bold text-blue-600 hover:text-blue-800 cursor-pointer"
+              className="text-xs font-bold text-blue-600 hover:text-blue-800 self-start sm:self-auto cursor-pointer"
             >
               Reset Category
             </button>
           )}
         </div>
 
+        {/* RADIUS GEOFENCE SELECTOR - Smooth Range Slider (1 KM to 20 KM, Default 5 KM) */}
+        <div id="radius-slider-card" className="bg-white rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs space-y-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 rounded-xl bg-blue-50 border border-blue-200/80 flex items-center justify-center text-blue-600 shrink-0">
+                <Navigation size={16} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-xs sm:text-sm font-bold text-slate-900">
+                    Search Radius: <span className="text-blue-600 font-extrabold">{searchRadiusKm} KM</span>
+                  </span>
+                  {searchRadiusKm === 5 ? (
+                    <span className="text-[10px] bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold px-2 py-0.5 rounded-full">
+                      Default 5 KM
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      id="reset-radius-default-btn"
+                      onClick={() => handleRadiusChange(5)}
+                      className="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold px-2 py-0.5 rounded-full transition-colors cursor-pointer"
+                    >
+                      Reset to 5 KM
+                    </button>
+                  )}
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Showing verified specialists active within {searchRadiusKm} KM of {currentLocation.city || 'your area'}
+                </p>
+              </div>
+            </div>
+
+            {/* Real-Time Radius Indicator Pill */}
+            <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+              <span className="text-xs font-semibold text-slate-600">Selected:</span>
+              <span className="px-3 py-1 bg-blue-600 text-white rounded-xl text-xs font-bold font-mono shadow-xs">
+                {searchRadiusKm} KM
+              </span>
+            </div>
+          </div>
+
+          {/* Smooth Interactive Range Slider Control */}
+          <div className="pt-1 px-1 space-y-2">
+            <div className="relative flex items-center">
+              <input
+                id="search-radius-range-slider"
+                type="range"
+                min={1}
+                max={20}
+                step={1}
+                value={searchRadiusKm}
+                onChange={(e) => handleRadiusChange(parseInt(e.target.value, 10))}
+                className="w-full h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 transition-all"
+                aria-label="Search Radius Range Slider"
+              />
+            </div>
+
+            {/* Tick Marks & Range Bounds (1 KM - 20 KM) */}
+            <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 px-0.5 select-none">
+              <span
+                onClick={() => handleRadiusChange(1)}
+                className={`cursor-pointer transition-colors ${searchRadiusKm === 1 ? 'text-blue-600 font-extrabold scale-105' : 'hover:text-slate-600'}`}
+              >
+                1 KM
+              </span>
+              <span
+                onClick={() => handleRadiusChange(5)}
+                className={`cursor-pointer transition-colors ${searchRadiusKm === 5 ? 'text-blue-600 font-extrabold scale-105' : 'hover:text-slate-600'}`}
+              >
+                5 KM (Default)
+              </span>
+              <span
+                onClick={() => handleRadiusChange(10)}
+                className={`cursor-pointer transition-colors ${searchRadiusKm === 10 ? 'text-blue-600 font-extrabold scale-105' : 'hover:text-slate-600'}`}
+              >
+                10 KM
+              </span>
+              <span
+                onClick={() => handleRadiusChange(15)}
+                className={`cursor-pointer transition-colors ${searchRadiusKm === 15 ? 'text-blue-600 font-extrabold scale-105' : 'hover:text-slate-600'}`}
+              >
+                15 KM
+              </span>
+              <span
+                onClick={() => handleRadiusChange(20)}
+                className={`cursor-pointer transition-colors ${searchRadiusKm === 20 ? 'text-blue-600 font-extrabold scale-105' : 'hover:text-slate-600'}`}
+              >
+                20 KM
+              </span>
+            </div>
+          </div>
+        </div>
+
         <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2.5">
-          {/* 22 Categories */}
+          {/* 25 Categories */}
           {SERVICE_CATEGORIES.map((cat) => {
             const isSelected = selectedCategory === cat.id;
 
@@ -332,7 +462,13 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               <button
                 key={cat.id}
                 type="button"
-                onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
+                onClick={() => {
+                  const nextCat = isSelected ? 'all' : cat.id;
+                  setSelectedCategory(nextCat);
+                  setTimeout(() => {
+                    document.getElementById('technicians-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }, 50);
+                }}
                 className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-2 shadow-xs group cursor-pointer ${
                   isSelected
                     ? 'bg-blue-50/80 text-blue-900 border-blue-600 ring-2 ring-blue-600/30 shadow-md scale-105'
@@ -351,172 +487,123 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         </div>
       </div>
 
-      {/* FILTER & COVERAGE TOOLBAR */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs p-3.5 space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/* Filter Pills */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setMinRating(minRating === 4.5 ? 0 : 4.5)}
-              className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                minRating >= 4.5
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-              }`}
-            >
-              <Star size={13} className="fill-current" />
-              <span>4.5+ Rating</span>
-            </button>
+      {/* FILTER PILLS */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setMinRating(minRating === 4.5 ? 0 : 4.5)}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+              minRating >= 4.5
+                ? 'bg-amber-500 text-white border-amber-500 shadow-xs'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+            }`}
+          >
+            <Star size={13} className="fill-current" />
+            <span>4.5+ Rating</span>
+          </button>
 
-            <button
-              type="button"
-              onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
-              className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border ${
-                showOnlyFavorites
-                  ? 'bg-red-500 text-white border-red-500 shadow-xs'
-                  : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-              }`}
-            >
-              <Heart size={13} className={showOnlyFavorites ? 'fill-current' : ''} />
-              <span>Saved ({favorites.length})</span>
-            </button>
-          </div>
-
-          {/* Dynamic Distance Coverage Slider (1km to 20km) */}
-          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/90 rounded-2xl px-3 py-1.5 shadow-2xs">
-            <div className="flex items-center gap-1.5">
-              <span className="text-[11px] font-bold text-slate-700">Radius:</span>
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => setMaxDistanceKm((prev) => Math.max(1, prev - 1))}
-                  disabled={maxDistanceKm <= 1}
-                  className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
-                  title="Decrease 1 km"
-                >
-                  <Minus size={11} />
-                </button>
-                <span className="text-xs font-extrabold text-blue-700 bg-blue-100/80 px-2 py-0.5 rounded-lg border border-blue-200 min-w-[44px] text-center">
-                  {maxDistanceKm} km
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setMaxDistanceKm((prev) => Math.min(20, prev + 1))}
-                  disabled={maxDistanceKm >= 20}
-                  className="w-5 h-5 flex items-center justify-center rounded-md bg-slate-200/80 hover:bg-slate-300 disabled:opacity-30 disabled:cursor-not-allowed text-slate-700 cursor-pointer"
-                  title="Increase 1 km"
-                >
-                  <Plus size={11} />
-                </button>
-              </div>
-            </div>
-
-            {/* Smooth Custom Slider (1 - 20 km) with onInput and dynamic fill */}
-            <input
-              type="range"
-              min={1}
-              max={20}
-              step={1}
-              value={maxDistanceKm}
-              onInput={(e) => {
-                const val = parseInt((e.target as HTMLInputElement).value, 10);
-                if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
-              }}
-              onChange={(e) => {
-                const val = parseInt(e.target.value, 10);
-                if (!isNaN(val)) setMaxDistanceKm(Math.min(20, Math.max(1, val)));
-              }}
-              className="w-20 sm:w-28 h-2 rounded-lg appearance-none cursor-pointer accent-blue-600 touch-none"
-              style={{
-                background: `linear-gradient(to right, #2563eb 0%, #2563eb ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 ${((maxDistanceKm - 1) / 19) * 100}%, #cbd5e1 100%)`,
-              }}
-              title={`Coverage Radius: ${maxDistanceKm} km`}
-            />
-
-            {/* Quick Preset Chips */}
-            <div className="hidden sm:flex items-center gap-1">
-              {[1, 3, 5, 10, 15, 20].map((step) => (
-                <button
-                  key={step}
-                  type="button"
-                  onClick={() => setMaxDistanceKm(step)}
-                  className={`px-1.5 py-0.5 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
-                    maxDistanceKm === step
-                      ? 'bg-blue-600 text-white shadow-2xs scale-105'
-                      : 'text-slate-500 hover:text-slate-900 bg-white border border-slate-200'
-                  }`}
-                >
-                  {step}k
-                </button>
-              ))}
-            </div>
-          </div>
+          <button
+            type="button"
+            onClick={() => setShowOnlyFavorites(!showOnlyFavorites)}
+            className={`py-1.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border cursor-pointer ${
+              showOnlyFavorites
+                ? 'bg-red-500 text-white border-red-500 shadow-xs'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200'
+            }`}
+          >
+            <Heart size={13} className={showOnlyFavorites ? 'fill-current' : ''} />
+            <span>Saved ({favorites.length})</span>
+          </button>
         </div>
       </div>
 
-      {/* TECHNICIANS LISTING GRID */}
-      <div>
-
-
+      {/* TECHNICIANS LISTING */}
+      <div id="technicians-section" className="scroll-mt-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-base font-bold text-slate-900">
-              {activeCategoryObj ? `${activeCategoryObj.name} Specialists` : 'Available Technicians'}
+            <h3 className="text-base sm:text-lg font-bold text-slate-900">
+              {activeCategoryObj ? `${activeCategoryObj.name} Technicians` : 'Verified Technicians'}
             </h3>
             <p className="text-xs text-slate-500">
-              Showing {filteredTechnicians.length} verified professionals near {currentLocation.city}
-              {currentLocation.state ? `, ${currentLocation.state}` : ''} (Sorted by closest proximity &le; 20 km)
+              {filteredTechnicians.length > 0
+                ? `Showing ${filteredTechnicians.length} verified specialist${filteredTechnicians.length > 1 ? 's' : ''} active within ${searchRadiusKm} KM of ${currentLocation.city}${currentLocation.state ? `, ${currentLocation.state}` : ''}`
+                : `No active technicians found within ${searchRadiusKm} KM of ${currentLocation.city}`}
             </p>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-blue-50 text-blue-700 font-bold px-3 py-1.5 rounded-xl border border-blue-200 text-xs self-start sm:self-auto">
-            <Navigation size={13} className="text-blue-600" />
-            <span>Native GPS Proximity (&le; 20 km)</span>
-          </div>
+          {selectedCategory !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setSelectedCategory('all')}
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-xl border border-blue-200 self-start sm:self-auto cursor-pointer transition-colors"
+            >
+              Show All Services
+            </button>
+          )}
         </div>
 
         {filteredTechnicians.length === 0 ? (
-          <div className="py-12 text-center bg-white rounded-3xl border border-dashed border-slate-300 p-6 sm:p-8 space-y-4">
-            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center">
-              <MapPin size={28} />
+          <div className="py-10 text-center bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-3 shadow-2xs">
+            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 mx-auto flex items-center justify-center">
+              <MapPin size={24} />
             </div>
             <div className="space-y-1">
-              <h3 className="text-base font-bold text-slate-900">
-                No technicians currently within 20 km in {currentLocation.city}
-                {currentLocation.state ? `, ${currentLocation.state}` : ''}
+              <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                {activeCategoryObj
+                  ? `No ${activeCategoryObj.name} technicians within ${searchRadiusKm} KM of ${currentLocation.city}`
+                  : `No technicians found within ${searchRadiusKm} KM of ${currentLocation.city}`}
               </h3>
               <p className="text-xs text-slate-500 max-w-md mx-auto">
-                No registered service providers have set their location coverage range within 20 km of your current position. You can pick another district/city or register as a service provider.
+                No verified technicians are currently within your {searchRadiusKm} KM radius. You can expand your search radius or select another location.
               </p>
             </div>
-            <div className="pt-2 flex flex-wrap items-center justify-center gap-2.5">
-              <button
-                type="button"
-                onClick={() => {
-                  setMaxDistanceKm(20);
-                  setSelectedCategory('all');
-                  setSearchQuery('');
-                  setMinRating(0);
-                }}
-                className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                Expand Search Range to 20 km
-              </button>
+
+            {/* Quick 1-tap Radius Expansion in Empty State */}
+            <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+              {searchRadiusKm < 15 && (
+                <button
+                  type="button"
+                  onClick={() => handleRadiusChange(15)}
+                  className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Expand Radius to 15 KM
+                </button>
+              )}
+              {searchRadiusKm < 25 && (
+                <button
+                  type="button"
+                  onClick={() => handleRadiusChange(25)}
+                  className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Expand Radius to 25 KM
+                </button>
+              )}
+              {searchRadiusKm < 50 && (
+                <button
+                  type="button"
+                  onClick={() => handleRadiusChange(50)}
+                  className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Expand to 50 KM
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setShowLocationModal(true)}
-                className="py-2.5 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer"
+                className="py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
               >
-                Pick Another District / State (दूसरा ज़िला चुनें)
+                Change Location
               </button>
-              <button
-                type="button"
-                onClick={onOpenTechnicianRegistration}
-                className="py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
-              >
-                Register as First Technician Here
-              </button>
+              {selectedCategory !== 'all' && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCategory('all')}
+                  className="py-2 px-4 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer"
+                >
+                  View All Services
+                </button>
+              )}
             </div>
           </div>
         ) : (
@@ -537,27 +624,28 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         )}
       </div>
 
-      {/* BECOME A SERVICE PROVIDER PROMO BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl border border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="space-y-2 text-center sm:text-left">
-          <div className="inline-flex items-center gap-1.5 bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2.5 py-1 rounded-full text-xs font-bold">
-            <Briefcase size={14} />
-            <span>Are you a technician or craftsman?</span>
+      {/* COMPACT STANDARDIZED SERVICE PROVIDER BANNER */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-slate-700 shadow-xs">
+        <div className="flex items-center gap-3 text-center sm:text-left">
+          <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 border border-blue-100">
+            <Briefcase size={16} />
           </div>
-          <h3 className="text-xl sm:text-2xl font-bold font-display text-white">
-            Grow Your Business with NeedFix
-          </h3>
-          <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-            Register as a verified service provider. Receive direct customer phone calls, WhatsApp leads, and earn with zero commission fees.
-          </p>
+          <div>
+            <span className="text-xs sm:text-sm font-bold text-slate-900 block">
+              Grow your business with Needfix. Become a service provider.
+            </span>
+            <span className="text-[11px] text-slate-500 block">
+              Direct customer calls • Zero commission • Free registration
+            </span>
+          </div>
         </div>
 
         <button
           type="button"
           onClick={onOpenTechnicianRegistration}
-          className="py-3.5 px-6 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-lg shadow-blue-600/30 shrink-0 transition-all flex items-center gap-2"
+          className="py-2 px-4 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shrink-0 shadow-xs cursor-pointer"
         >
-          <Briefcase size={16} />
+          <Briefcase size={13} />
           <span>Become a Service Provider</span>
         </button>
       </div>

@@ -56,7 +56,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   const [editHourlyRate, setEditHourlyRate] = useState<number | ''>(initialTech.hourlyRate || '');
   const [editRateCardNotes, setEditRateCardNotes] = useState(initialTech.rateCardNotes || '');
   const [editRadius, setEditRadius] = useState<number>(
-    initialTech.coverageRadiusKm && initialTech.coverageRadiusKm >= 1 ? initialTech.coverageRadiusKm : 10
+    initialTech.coverageRadiusKm && initialTech.coverageRadiusKm >= 1 ? initialTech.coverageRadiusKm : 5
   );
   const [editCoverageArea, setEditCoverageArea] = useState(initialTech.coverageAreaText);
   const [editWorkingHours, setEditWorkingHours] = useState(initialTech.workingHours);
