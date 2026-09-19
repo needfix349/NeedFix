@@ -148,10 +148,40 @@ class StorageService {
   }
 
   // --- CURRENT USER ---
+  clearSession() {
+    try {
+      localStorage.removeItem(KEYS.CURRENT_USER);
+      localStorage.removeItem('needfix_auth_token');
+      localStorage.removeItem('needfix_session');
+    } catch {}
+    this.notify();
+  }
+
   getCurrentUser(): UserProfile | null {
     try {
       const data = localStorage.getItem(KEYS.CURRENT_USER);
-      return data ? JSON.parse(data) : null;
+      if (!data) return null;
+      const user: UserProfile = JSON.parse(data);
+
+      // Check if user is blocked or device is blocked
+      if (user.isBlocked || (user as any).status === 'blocked') {
+        this.clearSession();
+        return null;
+      }
+
+      const blockedDevices = this.getBlockedDevices();
+      const isDeviceBlocked = blockedDevices.some(
+        (b) =>
+          (user.installationId && (b.deviceId === user.installationId || b.uniqueId === user.installationId)) ||
+          (user.username && (b.uniqueId?.toLowerCase() === user.username.toLowerCase() || b.targetName?.toLowerCase() === user.username.toLowerCase()))
+      );
+
+      if (isDeviceBlocked) {
+        this.clearSession();
+        return null;
+      }
+
+      return user;
     } catch {
       return null;
     }
@@ -159,6 +189,11 @@ class StorageService {
 
   setCurrentUser(user: UserProfile | null) {
     if (user) {
+      // Do not allow setting session if user or device is blocked
+      if (user.isBlocked || (user as any).status === 'blocked') {
+        this.clearSession();
+        return;
+      }
       localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
       // Also update in users list
       this.updateUser(user);
@@ -600,14 +635,32 @@ class StorageService {
     tech.isBlocked = willBeBlocked;
     if (willBeBlocked) {
       tech.blockedAt = new Date().toISOString();
-      tech.blockedReason = reason || 'Blocked / Blacklisted by Admin moderation';
+      tech.blockedReason = reason || 'Your account/device has been blocked by Admin. Access denied until unblocked.';
       tech.isOnline = false;
+      tech.status = 'blocked';
     } else {
       tech.blockedAt = undefined;
       tech.blockedReason = undefined;
+      tech.status = 'approved';
     }
 
     localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+
+    // Also update linked user profile
+    if (tech.userId) {
+      const user = this.getUserById(tech.userId);
+      if (user) {
+        user.isBlocked = willBeBlocked;
+        (user as any).status = willBeBlocked ? 'blocked' : 'approved';
+        this.updateUser(user);
+        if (willBeBlocked) {
+          const curr = this.getCurrentUser();
+          if (curr && curr.id === tech.userId) {
+            this.clearSession();
+          }
+        }
+      }
+    }
 
     // Audit log
     const auditLogs = this.getAuditLogs();

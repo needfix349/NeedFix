@@ -25,6 +25,7 @@ import {
   DEFAULT_USER_LOCATION,
   calculateDistanceKm,
   getCurrentGPSLocation,
+  get_nearby_technicians,
 } from '../../services/locationService';
 import { CategoryLogo } from '../common/CategoryLogo';
 import { TechnicianCard } from './TechnicianCard';
@@ -127,14 +128,19 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     }
   };
 
-  // Only approved and unblocked technicians are visible publicly to customers
-  const approvedTechnicians = useMemo(() => {
-    return technicians.filter((t) => t.status === 'approved' && !t.isBlocked);
-  }, [technicians]);
+  // Geofenced Nearby Technicians: Filtered strictly within selected radius (Min: 1 KM, Max: 20 KM, Default: 5 KM) using get_nearby_technicians
+  const nearbyApprovedTechnicians = useMemo(() => {
+    return get_nearby_technicians(
+      technicians,
+      currentLocation.latitude,
+      currentLocation.longitude,
+      searchRadiusKm
+    );
+  }, [technicians, currentLocation.latitude, currentLocation.longitude, searchRadiusKm]);
 
   // Filtered and sorted technicians
   const filteredTechnicians = useMemo(() => {
-    return approvedTechnicians
+    return nearbyApprovedTechnicians
       .filter((tech) => {
         if (showOnlyFavorites && !favorites.includes(tech.id)) return false;
         
@@ -147,18 +153,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         }
 
         if (minRating > 0 && tech.rating < minRating) return false;
-
-        // Geofenced Radius Filtering: Display ONLY active and approved technicians who fall within the set radius (default 5 KM or user-adjusted distance)
-        const distanceKm = calculateDistanceKm(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          tech.location.latitude,
-          tech.location.longitude
-        );
-
-        if (distanceKm > searchRadiusKm) {
-          return false;
-        }
 
         // Search text matching
         if (searchQuery.trim()) {
@@ -184,31 +178,35 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       })
       .sort((a, b) => {
         // Native GPS Proximity calculation: closest technician to customer's GPS is always FIRST!
-        const distA = calculateDistanceKm(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          a.location.latitude,
-          a.location.longitude
-        );
-        const distB = calculateDistanceKm(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          b.location.latitude,
-          b.location.longitude
-        );
+        const distA =
+          a.calculatedDistanceKm ??
+          calculateDistanceKm(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            a.location.latitude,
+            a.location.longitude
+          );
+        const distB =
+          b.calculatedDistanceKm ??
+          calculateDistanceKm(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            b.location.latitude,
+            b.location.longitude
+          );
 
         // Proximity priority: closest to current GPS comes first
-        return distA - distB;
+        if (distA !== distB) return distA - distB;
+        return b.rating - a.rating;
       });
   }, [
-    approvedTechnicians,
-    selectedCategory,
-    searchQuery,
-    minRating,
+    nearbyApprovedTechnicians,
     showOnlyFavorites,
     favorites,
+    selectedCategory,
+    minRating,
+    searchQuery,
     currentLocation,
-    searchRadiusKm,
   ]);
 
   const activeCategoryObj = SERVICE_CATEGORIES.find((c) => c.id === selectedCategory);
@@ -561,6 +559,15 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
 
             {/* Quick 1-tap Radius Expansion in Empty State */}
             <div className="pt-2 flex flex-wrap items-center justify-center gap-2">
+              {searchRadiusKm < 10 && (
+                <button
+                  type="button"
+                  onClick={() => handleRadiusChange(10)}
+                  className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                >
+                  Expand Radius to 10 KM
+                </button>
+              )}
               {searchRadiusKm < 15 && (
                 <button
                   type="button"
@@ -570,22 +577,13 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                   Expand Radius to 15 KM
                 </button>
               )}
-              {searchRadiusKm < 25 && (
+              {searchRadiusKm < 20 && (
                 <button
                   type="button"
-                  onClick={() => handleRadiusChange(25)}
+                  onClick={() => handleRadiusChange(20)}
                   className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
                 >
-                  Expand Radius to 25 KM
-                </button>
-              )}
-              {searchRadiusKm < 50 && (
-                <button
-                  type="button"
-                  onClick={() => handleRadiusChange(50)}
-                  className="py-2 px-3.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all cursor-pointer"
-                >
-                  Expand to 50 KM
+                  Expand to Max 20 KM
                 </button>
               )}
               <button

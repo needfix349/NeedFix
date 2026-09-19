@@ -22,7 +22,7 @@ export const NeedFixAppIcon: React.FC<NeedFixAppIconProps> = ({
     >
       {!hasError ? (
         <img
-          src="/needfix-logo.png"
+          src="/logo.png"
           alt={alt}
           width={size}
           height={size}

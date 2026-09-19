@@ -56,9 +56,16 @@ export default function App() {
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<DeviceSecurityStatus | null>(null);
 
-  // Device Security Verification without IP/fingerprint syncing on login
+  // Device Security Verification: Check if device or user is blocked
   const runDeviceSecurityVerification = async () => {
-    // Removed IP address & device fingerprint sync system on login
+    try {
+      const status = await deviceSecurityService.checkDeviceBlocked();
+      setSecurityStatus(status);
+      if (status.isBlocked) {
+        storageService.clearSession();
+        setCurrentUser(null);
+      }
+    } catch {}
   };
 
   // Ref to always track current navigation & modal state for popstate handler
@@ -188,7 +195,19 @@ export default function App() {
 
   // Load and subscribe to storage & Supabase auth
   const syncState = () => {
-    setCurrentUser(storageService.getCurrentUser());
+    const user = storageService.getCurrentUser();
+    if (user?.isBlocked || (user as any)?.status === 'blocked') {
+      storageService.clearSession();
+      setCurrentUser(null);
+      setSecurityStatus({
+        isBlocked: true,
+        reason: 'Your account/device has been blocked by Admin. Access denied until unblocked.',
+        deviceId: deviceSecurityService.getDeviceId(),
+        ip: '',
+      });
+    } else {
+      setCurrentUser(user);
+    }
     setTechnicians(storageService.getTechnicians());
     setFavorites(storageService.getFavorites());
   };

@@ -60,10 +60,10 @@ export const BlockedAccessScreen: React.FC<BlockedAccessScreenProps> = ({
               <span>System Access Blocked & Frozen</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Access Restricted by Administrator
+              Access Restricted
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-md mx-auto leading-relaxed">
-              Your device fingerprint and IP address have been blacklisted by NeedFix Security Protocols. All interactive features, direct calling, and WhatsApp messaging are completely frozen.
+            <p className="text-xs sm:text-sm text-red-300 font-semibold max-w-md mx-auto leading-relaxed">
+              Your account/device has been blocked by Admin. Access denied until unblocked.
             </p>
           </div>
         </div>

@@ -29,11 +29,13 @@ import {
   ZoomIn,
   Check,
   Users,
+  Copy,
 } from 'lucide-react';
-import { TechnicianProfile, AdminAuditLog, UserProfile } from '../../types';
+import { TechnicianProfile, AdminAuditLog, UserProfile, CustomerRecord } from '../../types';
 import { storageService } from '../../services/storage';
 import { supabaseService } from '../../services/supabaseService';
 import { isSupabaseConfigured } from '../../services/supabaseClient';
+import { deviceSecurityService } from '../../services/deviceSecurityService';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { SERVICE_CATEGORIES } from '../../data/categories';
 import { UserSecurityDirectory } from './UserSecurityDirectory';
@@ -55,15 +57,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   );
 
   const [technicians, setTechnicians] = useState<TechnicianProfile[]>([]);
+  const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [auditLogs, setAuditLogs] = useState<AdminAuditLog[]>([]);
   const [selectedTech, setSelectedTech] = useState<TechnicianProfile | null>(null);
   const [activeTab, setActiveTab] = useState<
-    'pending' | 'all' | 'security_directory' | 'blocked' | 'audit'
+    'pending' | 'all' | 'customers' | 'security_directory' | 'blocked' | 'audit'
   >('pending');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [idSearchQuery, setIdSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [techSortOrder, setTechSortOrder] = useState<'id_asc' | 'id_desc' | 'name'>('id_asc');
 
   // Zoomed Aadhaar image preview modal
   const [zoomedAadhaarUrl, setZoomedAadhaarUrl] = useState<string | null>(null);
@@ -104,6 +109,20 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setTechnicians(allTechs);
       }
     }).catch(console.warn);
+
+    deviceSecurityService.getAllCustomers().then((custs) => {
+      if (custs) {
+        setCustomers(custs);
+      }
+    }).catch(console.warn);
+  };
+
+  const handleCopyId = (code: string) => {
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(code);
+      setCopiedId(code);
+      setTimeout(() => setCopiedId(null), 2000);
+    }
   };
 
   useEffect(() => {
@@ -265,55 +284,97 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // Helper to extract numeric part for natural ID sorting (e.g. TECH-1 -> 1, TECH-2 -> 2)
+  const getNumericIdVal = (str?: string): number => {
+    if (!str) return 999999;
+    const m = str.match(/\d+/);
+    return m ? parseInt(m[0], 10) : 999999;
+  };
+
   // Filtered list with ID search & general search
   const filteredTechnicians = useMemo(() => {
-    return technicians.filter((t) => {
-      // Tab filter
-      const isPending =
-        (t.status === 'pending' || (!t.isApproved && t.status !== 'rejected' && t.status !== 'suspended')) &&
-        !t.isBlocked;
+    return technicians
+      .filter((t) => {
+        // Tab filter
+        const isPending =
+          (t.status === 'pending' || (!t.isApproved && t.status !== 'rejected' && t.status !== 'suspended')) &&
+          !t.isBlocked;
 
-      if (activeTab === 'pending' && !isPending) return false;
-      if (activeTab === 'blocked' && !t.isBlocked) return false;
-      if (activeTab === 'all' && statusFilter !== 'all' && t.status !== statusFilter) return false;
+        if (activeTab === 'pending' && !isPending) return false;
+        if (activeTab === 'blocked' && !t.isBlocked) return false;
+        if (activeTab === 'all' && statusFilter !== 'all' && t.status !== statusFilter) return false;
 
-      // Category filter
-      if (selectedCategory !== 'all') {
-        const matchCat =
-          t.categoryId === selectedCategory ||
-          (t.categoryIds && t.categoryIds.includes(selectedCategory));
-        if (!matchCat) return false;
-      }
-
-      // Dedicated ID Search
-      if (idSearchQuery.trim()) {
-        const idQ = idSearchQuery.trim().toLowerCase();
-        const code = (t.technicianCode || '').toLowerCase();
-        if (!code.includes(idQ)) {
-          return false;
+        // Category filter
+        if (selectedCategory !== 'all') {
+          const matchCat =
+            t.categoryId === selectedCategory ||
+            (t.categoryIds && t.categoryIds.includes(selectedCategory));
+          if (!matchCat) return false;
         }
-      }
 
-      // General search (name, phone, company, category, code)
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        const matchCode = (t.technicianCode || '').toLowerCase().includes(q);
-        const matchName = t.fullName.toLowerCase().includes(q);
-        const matchCompany = t.companyName.toLowerCase().includes(q);
-        const matchCategory =
-          t.categoryName.toLowerCase().includes(q) ||
-          (t.categoryNames && t.categoryNames.some((c) => c.toLowerCase().includes(q)));
-        const matchMobile = t.mobile.includes(searchQuery.trim());
-        const matchAadhaar = (t.documents?.aadhaarNumber || '').includes(searchQuery.trim());
+        // Dedicated ID Search (Handles "TECH-1", "1", "tech1", "NF-TECH-1001", etc.)
+        if (idSearchQuery.trim()) {
+          const idQ = idSearchQuery.trim().toLowerCase();
+          const code = (t.technicianCode || '').toLowerCase();
+          const rawId = (t.id || '').toLowerCase();
 
-        if (!matchCode && !matchName && !matchCompany && !matchCategory && !matchMobile && !matchAadhaar) {
-          return false;
+          let match = code.includes(idQ) || rawId.includes(idQ);
+          if (!match) {
+            const cleanQ = idQ.replace(/[^a-z0-9]/g, '');
+            const cleanCode = code.replace(/[^a-z0-9]/g, '');
+            const cleanId = rawId.replace(/[^a-z0-9]/g, '');
+            if (cleanQ && (cleanCode.includes(cleanQ) || cleanId.includes(cleanQ))) {
+              match = true;
+            }
+          }
+          if (!match) {
+            const digits = idQ.replace(/\D/g, '');
+            if (digits) {
+              const codeDigits = code.replace(/\D/g, '');
+              if (codeDigits === digits || codeDigits.endsWith(digits)) {
+                match = true;
+              }
+            }
+          }
+          if (!match) {
+            return false;
+          }
         }
-      }
 
-      return true;
-    });
-  }, [technicians, activeTab, statusFilter, selectedCategory, idSearchQuery, searchQuery]);
+        // General search (name, phone, company, category, code)
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          const code = (t.technicianCode || '').toLowerCase();
+          const rawId = (t.id || '').toLowerCase();
+          const matchCode =
+            code.includes(q) ||
+            rawId.includes(q) ||
+            code.replace(/[^a-z0-9]/g, '').includes(q.replace(/[^a-z0-9]/g, ''));
+          const matchName = t.fullName.toLowerCase().includes(q);
+          const matchCompany = t.companyName.toLowerCase().includes(q);
+          const matchCategory =
+            t.categoryName.toLowerCase().includes(q) ||
+            (t.categoryNames && t.categoryNames.some((c) => c.toLowerCase().includes(q)));
+          const matchMobile = t.mobile.includes(searchQuery.trim());
+          const matchAadhaar = (t.documents?.aadhaarNumber || '').includes(searchQuery.trim());
+
+          if (!matchCode && !matchName && !matchCompany && !matchCategory && !matchMobile && !matchAadhaar) {
+            return false;
+          }
+        }
+
+        return true;
+      })
+      .sort((a, b) => {
+        if (techSortOrder === 'id_asc') {
+          return getNumericIdVal(a.technicianCode || a.id) - getNumericIdVal(b.technicianCode || b.id);
+        }
+        if (techSortOrder === 'id_desc') {
+          return getNumericIdVal(b.technicianCode || b.id) - getNumericIdVal(a.technicianCode || a.id);
+        }
+        return a.fullName.localeCompare(b.fullName);
+      });
+  }, [technicians, activeTab, statusFilter, selectedCategory, idSearchQuery, searchQuery, techSortOrder]);
 
   // Active concurrent admin sessions
   const activeSessions = supabaseService.getActiveAdminSessions();
@@ -517,8 +578,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <CheckCircle2 size={20} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Approved & Live</p>
+            <p className="text-xs text-slate-500 font-medium">Live Technicians</p>
             <p className="text-xl font-bold text-slate-900 font-mono">{approvedTechs.length}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
+            <Users size={20} />
+          </div>
+          <div>
+            <p className="text-xs text-slate-500 font-medium">Tracked Customers</p>
+            <p className="text-xl font-bold text-blue-700 font-mono">{customers.length}</p>
           </div>
         </div>
 
@@ -527,18 +598,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <Ban size={20} />
           </div>
           <div>
-            <p className="text-xs text-slate-500 font-medium">Blocked / Blacklisted</p>
+            <p className="text-xs text-slate-500 font-medium">Blocked Accounts</p>
             <p className="text-xl font-bold text-red-700 font-mono">{blockedTechs.length}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center font-bold">
-            <Building size={20} />
-          </div>
-          <div>
-            <p className="text-xs text-slate-500 font-medium">Total Registered</p>
-            <p className="text-xl font-bold text-slate-900 font-mono">{technicians.length}</p>
           </div>
         </div>
       </div>
@@ -574,7 +635,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               }`}
             >
               <User size={14} />
-              <span>All Technicians Directory ({technicians.length})</span>
+              <span>Technicians Directory ({technicians.length})</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('customers')}
+              className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                activeTab === 'customers'
+                  ? 'bg-blue-700 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <Users size={14} />
+              <span>Customers Directory ({customers.length})</span>
             </button>
 
             <button
@@ -593,12 +666,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               onClick={() => setActiveTab('security_directory')}
               className={`py-2 px-3.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
                 activeTab === 'security_directory'
-                  ? 'bg-blue-700 text-white shadow-xs'
+                  ? 'bg-indigo-700 text-white shadow-xs'
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
               }`}
             >
-              <Users size={14} />
-              <span>Customers & Techs Security Directory</span>
+              <ShieldCheck size={14} />
+              <span>Device Security & Resets</span>
             </button>
 
             <button
@@ -615,15 +688,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </div>
         </div>
 
-        {/* Search & Filter Controls (Dedicated Auto ID Search & Name Search) */}
-        {activeTab !== 'audit' && activeTab !== 'security_directory' && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+        {/* Search & Filter Controls (Dedicated Auto ID Search, Name Search & Sort) */}
+        {activeTab !== 'audit' && activeTab !== 'security_directory' && activeTab !== 'customers' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2.5 pt-1">
             {/* Dedicated Technician ID Search */}
             <div className="relative">
               <Key size={14} className="absolute left-3 top-3 text-indigo-500" />
               <input
                 type="text"
-                placeholder="Search by ID (e.g. NF-TECH-1001)..."
+                placeholder="Search by ID (e.g. TECH-1, 1)..."
                 value={idSearchQuery}
                 onChange={(e) => setIdSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs bg-indigo-50/50 border border-indigo-200 rounded-xl outline-none focus:border-indigo-600 font-mono font-semibold text-indigo-950 placeholder:text-indigo-400/80"
@@ -644,7 +717,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <Search size={14} className="absolute left-3 top-3 text-slate-400" />
               <input
                 type="text"
-                placeholder="Search name, phone, company, Aadhaar..."
+                placeholder="Search name, phone, company..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl outline-none focus:border-blue-600 text-slate-800"
@@ -664,7 +737,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none"
+              className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none cursor-pointer"
             >
               <option value="all">All Categories ({SERVICE_CATEGORIES.length})</option>
               {SERVICE_CATEGORIES.map((c) => (
@@ -679,7 +752,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none"
+                className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none cursor-pointer"
               >
                 <option value="all">All Statuses</option>
                 <option value="approved">Approved Only</option>
@@ -692,7 +765,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                 Showing <span className="font-bold text-slate-900 mx-1">{filteredTechnicians.length}</span> results
               </div>
             )}
+
+            {/* Sort Order by ID / Name */}
+            <select
+              value={techSortOrder}
+              onChange={(e) => setTechSortOrder(e.target.value as any)}
+              className="px-3 py-2 text-xs bg-slate-100 border border-slate-200 rounded-xl font-semibold text-slate-700 outline-none cursor-pointer"
+            >
+              <option value="id_asc">Sort: ID (TECH-1, TECH-2...)</option>
+              <option value="id_desc">Sort: ID (High to Low)</option>
+              <option value="name">Sort: Name (A-Z)</option>
+            </select>
           </div>
+        )}
+
+        {/* CUSTOMERS DIRECTORY TAB */}
+        {activeTab === 'customers' && (
+          <UserSecurityDirectory
+            adminName={currentUser?.name || 'Administrator'}
+            technicians={technicians}
+            onRefreshData={loadData}
+            initialTab="customers"
+          />
         )}
 
         {/* SECURITY & USER DIRECTORY TAB (CUSTOMERS & TECHS WITH IP & DEVICE TRACKING) */}
@@ -805,11 +899,24 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               className="w-14 h-14 rounded-2xl object-cover border border-slate-200 shrink-0"
                             />
                             <div>
-                              {/* Technician Auto-Generated ID Badge */}
+                              {/* Technician Auto-Generated ID Badge with 1-Click Copy */}
                               <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                                <span className="font-mono text-[11px] font-black px-2 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md tracking-wider">
-                                  {tech.technicianCode || 'NF-TECH-1000'}
+                                <span className="font-mono text-[11px] font-black px-2 py-0.5 bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-md tracking-wider flex items-center gap-1">
+                                  <Key size={10} className="text-indigo-600" />
+                                  <span>{tech.technicianCode || 'TECH-1'}</span>
                                 </span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyId(tech.technicianCode || tech.id)}
+                                  className="p-1 rounded hover:bg-indigo-100 text-slate-400 hover:text-indigo-700 transition-colors cursor-pointer"
+                                  title="Copy Technician ID"
+                                >
+                                  {copiedId === (tech.technicianCode || tech.id) ? (
+                                    <Check size={12} className="text-emerald-600" />
+                                  ) : (
+                                    <Copy size={12} />
+                                  )}
+                                </button>
                                 {tech.isVerified && <VerifiedBadge size="sm" showText={false} />}
                               </div>
 

@@ -67,18 +67,25 @@ class AccountService {
    * Check if an Installation ID or Username is blocked
    */
   async isInstallationOrUserBlocked(installationId: string, username?: string): Promise<{ isBlocked: boolean; reason?: string }> {
+    const blockedMsg = "Your account/device has been blocked by Admin. Access denied until unblocked.";
+
     // 1. Check local blocked registry
     const blockedDevices = storageService.getBlockedDevices();
     const matchDevice = blockedDevices.find((b) => b.deviceId === installationId || (b.uniqueId && b.uniqueId === installationId));
     if (matchDevice) {
-      return { isBlocked: true, reason: matchDevice.reason || 'Device installation has been restricted by Administrator.' };
+      return { isBlocked: true, reason: blockedMsg };
     }
 
     if (username) {
       const cleanUser = username.trim().toLowerCase();
       const matchUser = blockedDevices.find((b) => b.uniqueId?.toLowerCase() === cleanUser || b.targetName?.toLowerCase() === cleanUser);
       if (matchUser) {
-        return { isBlocked: true, reason: matchUser.reason || 'Account is blocked by Administrator.' };
+        return { isBlocked: true, reason: blockedMsg };
+      }
+
+      const localUser = storageService.getUserByUsername(cleanUser);
+      if (localUser && (localUser.isBlocked || (localUser as any).status === 'blocked')) {
+        return { isBlocked: true, reason: blockedMsg };
       }
     }
 
@@ -92,7 +99,22 @@ class AccountService {
           .limit(1);
 
         if (!error && data && data.length > 0) {
-          return { isBlocked: true, reason: data[0].reason || 'Installation ID is blacklisted by Administrator.' };
+          return { isBlocked: true, reason: blockedMsg };
+        }
+
+        if (username) {
+          const cleanUser = username.trim().toLowerCase();
+          const { data: userData, error: userErr } = await supabase
+            .from('users')
+            .select('status, is_blocked')
+            .or(`username.ilike.${cleanUser},id.eq.${cleanUser}`)
+            .limit(1);
+
+          if (!userErr && userData && userData.length > 0) {
+            if (userData[0].status === 'blocked' || userData[0].is_blocked) {
+              return { isBlocked: true, reason: blockedMsg };
+            }
+          }
         }
       } catch (err) {
         console.warn('Supabase blocked installation check warning:', err);
@@ -236,10 +258,11 @@ class AccountService {
     // Check device / user block status
     const blockCheck = await this.isInstallationOrUserBlocked(installationId, cleanUsername);
     if (blockCheck.isBlocked) {
+      storageService.clearSession();
       return {
         success: false,
         isBlocked: true,
-        message: `Account or Device Restricted: ${blockCheck.reason || 'Contact Administrator for review.'}`,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
       };
     }
 
@@ -248,11 +271,20 @@ class AccountService {
     const passHash = this.hashSecret(cleanPassword);
 
     if (user) {
-      if (user.isBlocked) {
+      if (user.status === 'pending_deletion') {
+        storageService.clearSession();
+        return {
+          success: false,
+          message: 'This account has been permanently deleted. Please register a new account.',
+        };
+      }
+
+      if (user.isBlocked || (user as any).status === 'blocked') {
+        storageService.clearSession();
         return {
           success: false,
           isBlocked: true,
-          message: `Account is suspended: ${user.blockedReason || 'Terms violation.'}`,
+          message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
         };
       }
 
@@ -283,6 +315,23 @@ class AccountService {
           .maybeSingle();
 
         if (!error && data) {
+          if (data.status === 'pending_deletion') {
+            storageService.clearSession();
+            return {
+              success: false,
+              message: 'This account has been permanently deleted. Please register a new account.',
+            };
+          }
+
+          if (data.status === 'blocked' || data.is_blocked) {
+            storageService.clearSession();
+            return {
+              success: false,
+              isBlocked: true,
+              message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+            };
+          }
+
           const fetchedUser: UserProfile = {
             id: data.id,
             username: data.username || cleanUsername,
@@ -339,7 +388,28 @@ class AccountService {
       return { success: false, message: 'New password must be at least 4 characters long.' };
     }
 
+    // Check device / user block status before password reset attempt
+    const installationId = deviceSecurityService.getDeviceId();
+    const blockCheck = await this.isInstallationOrUserBlocked(installationId, cleanUser);
+    if (blockCheck.isBlocked) {
+      storageService.clearSession();
+      return {
+        success: false,
+        isBlocked: true,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+      };
+    }
+
     let user = storageService.getUserByUsername(cleanUser) || storageService.getUserByAccountIdentifier(cleanUser);
+
+    if (user && (user.isBlocked || (user as any).status === 'blocked')) {
+      storageService.clearSession();
+      return {
+        success: false,
+        isBlocked: true,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+      };
+    }
 
     // If not found in local storage, query Supabase
     if (!user && isSupabaseConfigured()) {
@@ -351,6 +421,15 @@ class AccountService {
           .maybeSingle();
 
         if (!error && data) {
+          if (data.status === 'blocked' || data.is_blocked) {
+            storageService.clearSession();
+            return {
+              success: false,
+              isBlocked: true,
+              message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+            };
+          }
+
           user = {
             id: data.id,
             username: data.username || cleanUser,
@@ -373,6 +452,15 @@ class AccountService {
 
     if (!user) {
       return { success: false, message: 'Account not found for this username. Please verify spelling.' };
+    }
+
+    if (user.isBlocked || (user as any).status === 'blocked') {
+      storageService.clearSession();
+      return {
+        success: false,
+        isBlocked: true,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+      };
     }
 
     const expectedPinHash = this.hashPin(cleanPin);
@@ -415,10 +503,10 @@ class AccountService {
   }
 
   /**
-   * Update customer search radius preference (defaults to 5 KM)
+   * Update customer search radius preference (defaults to 5 KM, range 1 - 20 KM)
    */
   async updateUserSearchRadius(userId: string, radiusKm: number): Promise<void> {
-    const validRadius = Math.max(1, Math.min(100, radiusKm));
+    const validRadius = Math.max(1, Math.min(20, radiusKm));
     const user = storageService.getUserById(userId);
     if (user) {
       user.searchRadiusKm = validRadius;
@@ -505,7 +593,29 @@ class AccountService {
     newPassword: string;
   }): Promise<AuthResponse> {
     const cleanUser = params.username.trim().toLowerCase();
+    const installationId = deviceSecurityService.getDeviceId();
+
+    // Check device / user block status before password reset attempt
+    const blockCheck = await this.isInstallationOrUserBlocked(installationId, cleanUser);
+    if (blockCheck.isBlocked) {
+      storageService.clearSession();
+      return {
+        success: false,
+        isBlocked: true,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+      };
+    }
+
     const user = storageService.getUserByUsername(cleanUser) || storageService.getUserByAccountIdentifier(cleanUser);
+
+    if (user && (user.isBlocked || (user as any).status === 'blocked')) {
+      storageService.clearSession();
+      return {
+        success: false,
+        isBlocked: true,
+        message: "Your account/device has been blocked by Admin. Access denied until unblocked.",
+      };
+    }
 
     if (!user) {
       return { success: false, message: 'Account not found for this username.' };
@@ -592,6 +702,51 @@ class AccountService {
       success: true,
       message: 'Password reset ticket submitted to Admin Desk. Our support team will verify your phone number and issue a temporary credential.',
       requestId: req.id,
+    };
+  }
+
+  /**
+   * Request account deletion with 4-digit secret PIN verification
+   * Updates status to 'pending_deletion' and clears local session data
+   */
+  async deleteAccountWithPin(userId: string, pin: string): Promise<{ success: boolean; message: string }> {
+    const cleanPin = (pin || '').trim();
+    if (!/^\d{4}$/.test(cleanPin)) {
+      return { success: false, message: 'Please enter a valid 4-digit numeric PIN.' };
+    }
+
+    const user = storageService.getUserById(userId);
+    if (!user) {
+      return { success: false, message: 'Account not found.' };
+    }
+
+    const pinHash = this.hashPin(cleanPin);
+    if (user.securityPinHash && user.securityPinHash !== pinHash) {
+      return { success: false, message: 'Incorrect 4-digit Security PIN. Deletion cancelled.' };
+    }
+
+    // Update status to pending_deletion
+    user.status = 'pending_deletion';
+    storageService.updateUser(user);
+
+    // If Supabase is configured, update users table
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('users')
+          .update({ status: 'pending_deletion' })
+          .eq('id', userId);
+      } catch (err) {
+        console.warn('Supabase account deletion status update error:', err);
+      }
+    }
+
+    // Clear local session data
+    storageService.clearSession();
+
+    return {
+      success: true,
+      message: 'Your Needfix account has been marked for permanent deletion. Session cleared.',
     };
   }
 }

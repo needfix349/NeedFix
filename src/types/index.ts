@@ -1,6 +1,6 @@
 export type UserRole = 'customer' | 'technician' | 'admin';
 
-export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'suspended';
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected' | 'suspended' | 'blocked' | 'pending_deletion';
 
 export type KYCStatus = 'not_started' | 'pending_verification' | 'verified' | 'rejected';
 
@@ -66,6 +66,7 @@ export interface UserProfile {
   installationId?: string;
   securityPinHash?: string; // Encrypted/hashed 4-digit numeric PIN for instant password recovery
   searchRadiusKm?: number; // Service and search geofenced radius in KM (Default: 5 KM)
+  status?: ApplicationStatus;
   securityQuestions?: SecurityQuestionConfig;
   isBlocked?: boolean;
   blockedReason?: string;

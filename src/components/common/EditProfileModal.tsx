@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Shield, CheckCircle2, AlertCircle, RefreshCw, Copy, Check } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { X, User, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { UserProfile } from '../../types';
 import { accountService } from '../../services/accountService';
 
@@ -20,27 +21,16 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [hasCopiedId, setHasCopiedId] = useState(false);
 
   useEffect(() => {
     if (isOpen && currentUser) {
       setName(currentUser.name || '');
       setErrorMessage(null);
       setSuccessMessage(null);
-      setHasCopiedId(false);
     }
   }, [isOpen, currentUser]);
 
   if (!isOpen || !currentUser) return null;
-
-  const handleCopyAccountId = () => {
-    const idToCopy = currentUser.id;
-    if (navigator?.clipboard?.writeText) {
-      navigator.clipboard.writeText(idToCopy);
-      setHasCopiedId(true);
-      setTimeout(() => setHasCopiedId(false), 2500);
-    }
-  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,7 +53,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
         }
         setTimeout(() => {
           onClose();
-        }, 800);
+        }, 500);
       } else {
         setErrorMessage(res.message || 'Failed to update name.');
       }
@@ -74,37 +64,36 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
     }
   };
 
-  return (
+  const modalContent = (
     <div
       id="edit-profile-modal-backdrop"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
+      className="fixed inset-0 z-[9999] flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-xs animate-in fade-in"
       onClick={onClose}
     >
       <div
         id="edit-profile-modal-dialog"
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200"
+        className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-100 w-full max-w-md max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200 my-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 p-5 sm:p-6 text-white relative">
+        <div className="p-5 sm:p-6 pb-4 border-b border-slate-100 relative">
           <button
             type="button"
             id="edit-profile-close-btn"
             onClick={onClose}
-            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white transition-colors cursor-pointer"
+            className="absolute top-4 right-4 w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-500 transition-colors cursor-pointer"
             aria-label="Close modal"
           >
             <X size={18} />
           </button>
 
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-white/15 backdrop-blur-xs border border-white/20 flex items-center justify-center text-white shrink-0">
-              <User size={20} />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold font-display text-white">Edit Profile Details</h2>
-              <p className="text-xs text-blue-100">Update your display name while keeping your permanent ID intact</p>
-            </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold font-display text-slate-900 tracking-tight">
+              Edit Display Name
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              @{currentUser.username || 'user'}
+            </p>
           </div>
         </div>
 
@@ -124,7 +113,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
             </div>
           )}
 
-          {/* Editable Full Name Field */}
+          {/* Clean Editable Name Field */}
           <div>
             <label htmlFor="edit-profile-name-input" className="block text-xs font-bold text-slate-700 mb-1.5">
               Name <span className="text-red-500">*</span>
@@ -139,61 +128,24 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Alex Morgan"
+                placeholder="e.g. Alex"
                 className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 focus:outline-hidden focus:ring-2 focus:ring-blue-500 focus:bg-white transition-all"
                 autoFocus
               />
             </div>
-            <p className="text-[11px] text-slate-500 mt-1">This name will be displayed across your service bookings and profile.</p>
-          </div>
-
-          {/* Read-Only Permanent Username Field */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-slate-700">Permanent Username</label>
-              <span className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md flex items-center gap-1">
-                <Shield size={10} className="text-slate-500" />
-                Read-Only
-              </span>
-            </div>
-            <div className="px-3.5 py-2.5 bg-slate-100/90 border border-slate-200 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-700 select-all flex items-center justify-between">
-              <span>@{currentUser.username || 'user'}</span>
-              <span className="text-[10px] text-slate-400 font-sans font-normal">Permanent ID</span>
-            </div>
-            <p className="text-[11px] text-slate-500 mt-1">Your username is permanently linked to your account for secure sign-in.</p>
-          </div>
-
-          {/* Read-Only Permanent Account ID Field */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-bold text-slate-700">Permanent Account ID</label>
-              <span className="text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md flex items-center gap-1">
-                <Shield size={10} className="text-slate-500" />
-                Read-Only
-              </span>
-            </div>
-            <div className="px-3.5 py-2.5 bg-slate-100/90 border border-slate-200 rounded-xl text-xs font-mono font-semibold text-slate-600 select-all flex items-center justify-between gap-2 overflow-hidden">
-              <span className="truncate">{currentUser.id}</span>
-              <button
-                type="button"
-                id="copy-account-id-btn"
-                onClick={handleCopyAccountId}
-                className="shrink-0 p-1.5 text-slate-500 hover:text-blue-600 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
-                title="Copy Account ID"
-              >
-                {hasCopiedId ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-              </button>
-            </div>
+            <p className="text-[11px] text-slate-400 mt-1">
+              Your name will be visible to technicians when booking services.
+            </p>
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2.5">
+          <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-slate-100">
             <button
               type="button"
               id="edit-profile-cancel-btn"
               onClick={onClose}
               disabled={isLoading}
-              className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
+              className="py-2.5 px-4 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs sm:text-sm font-bold transition-all cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
@@ -217,4 +169,9 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

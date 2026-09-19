@@ -19,6 +19,7 @@ import {
   Copy,
   Check,
   Phone,
+  MessageSquare,
   KeyRound,
 } from 'lucide-react';
 import { CustomerRecord, TechnicianProfile, BlockedDeviceRecord, PasswordResetRequest } from '../../types';
@@ -29,16 +30,20 @@ interface UserSecurityDirectoryProps {
   adminName?: string;
   technicians: TechnicianProfile[];
   onRefreshData?: () => void;
+  initialTab?: 'customers' | 'technicians' | 'blocked' | 'password_resets';
 }
 
 export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
   adminName = 'NeedFix Administrator',
   technicians,
   onRefreshData,
+  initialTab = 'customers',
 }) => {
   // Toggle Switch: 'customers' | 'technicians' | 'blocked' | 'password_resets'
-  const [activeDirectoryTab, setActiveDirectoryTab] = useState<'customers' | 'technicians' | 'blocked' | 'password_resets'>('customers');
+  const [activeDirectoryTab, setActiveDirectoryTab] = useState<'customers' | 'technicians' | 'blocked' | 'password_resets'>(initialTab);
   const [searchQuery, setSearchQuery] = useState('');
+  const [customerSortOrder, setCustomerSortOrder] = useState<'id_asc' | 'id_desc' | 'recent' | 'name'>('id_asc');
+  const [techSortOrder, setTechSortOrder] = useState<'id_asc' | 'id_desc' | 'name'>('id_asc');
   const [customers, setCustomers] = useState<CustomerRecord[]>([]);
   const [blockedDevices, setBlockedDevices] = useState<BlockedDeviceRecord[]>([]);
   const [resetRequests, setResetRequests] = useState<PasswordResetRequest[]>([]);
@@ -157,35 +162,99 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
     }
   };
 
-  // Filter Customers
+  // Helper to extract numeric part for natural ID sorting (e.g. CUST-1 -> 1, TECH-2 -> 2)
+  const getNumericIdVal = (str?: string): number => {
+    if (!str) return 999999;
+    const m = str.match(/\d+/);
+    return m ? parseInt(m[0], 10) : 999999;
+  };
+
+  // Filter & Sort Customers
   const filteredCustomers = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return customers;
-    return customers.filter(
-      (c) =>
-        c.customerId.toLowerCase().includes(q) ||
-        c.name.toLowerCase().includes(q) ||
-        (c.phone && c.phone.includes(q)) ||
-        c.ipAddress.includes(q) ||
-        c.deviceId.toLowerCase().includes(q)
-    );
-  }, [customers, searchQuery]);
+    let list = customers;
 
-  // Filter Technicians
+    if (q) {
+      list = customers.filter((c) => {
+        const cid = (c.customerId || '').toLowerCase();
+        if (cid.includes(q)) return true;
+
+        // Clean alphanumeric match (e.g. "cust1" matches "CUST-1")
+        const cleanQ = q.replace(/[^a-z0-9]/g, '');
+        const cleanCid = cid.replace(/[^a-z0-9]/g, '');
+        if (cleanQ && cleanCid.includes(cleanQ)) return true;
+
+        // Pure digits match (e.g. typing "1" finds "CUST-1")
+        const digits = q.replace(/\D/g, '');
+        if (digits && cid.replace(/\D/g, '') === digits) return true;
+
+        return (
+          c.name.toLowerCase().includes(q) ||
+          (c.phone && c.phone.includes(q)) ||
+          c.ipAddress.includes(q) ||
+          c.deviceId.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      if (customerSortOrder === 'id_asc') {
+        return getNumericIdVal(a.customerId) - getNumericIdVal(b.customerId);
+      }
+      if (customerSortOrder === 'id_desc') {
+        return getNumericIdVal(b.customerId) - getNumericIdVal(a.customerId);
+      }
+      if (customerSortOrder === 'recent') {
+        return new Date(b.lastSeenAt || b.createdAt).getTime() - new Date(a.lastSeenAt || a.createdAt).getTime();
+      }
+      return a.name.localeCompare(b.name);
+    });
+  }, [customers, searchQuery, customerSortOrder]);
+
+  // Filter & Sort Technicians
   const filteredTechnicians = useMemo(() => {
     const q = searchQuery.toLowerCase().trim();
-    if (!q) return technicians;
-    return technicians.filter(
-      (t) =>
-        (t.technicianCode && t.technicianCode.toLowerCase().includes(q)) ||
-        t.fullName.toLowerCase().includes(q) ||
-        t.mobile.includes(q) ||
-        (t.whatsappNumber && t.whatsappNumber.includes(q)) ||
-        (t.ipAddress && t.ipAddress.includes(q)) ||
-        (t.deviceId && t.deviceId.toLowerCase().includes(q)) ||
-        t.categoryName.toLowerCase().includes(q)
-    );
-  }, [technicians, searchQuery]);
+    let list = technicians;
+
+    if (q) {
+      list = technicians.filter((t) => {
+        const code = (t.technicianCode || '').toLowerCase();
+        const rawId = (t.id || '').toLowerCase();
+        if (code.includes(q) || rawId.includes(q)) return true;
+
+        const cleanQ = q.replace(/[^a-z0-9]/g, '');
+        const cleanCode = code.replace(/[^a-z0-9]/g, '');
+        const cleanId = rawId.replace(/[^a-z0-9]/g, '');
+        if (cleanQ && (cleanCode.includes(cleanQ) || cleanId.includes(cleanQ))) return true;
+
+        // Pure digits match (e.g. "1" matches "TECH-1")
+        const digits = q.replace(/\D/g, '');
+        if (digits) {
+          const codeDigits = code.replace(/\D/g, '');
+          if (codeDigits === digits || codeDigits.endsWith(digits)) return true;
+        }
+
+        return (
+          t.fullName.toLowerCase().includes(q) ||
+          t.mobile.includes(q) ||
+          (t.whatsappNumber && t.whatsappNumber.includes(q)) ||
+          (t.ipAddress && t.ipAddress.includes(q)) ||
+          (t.deviceId && t.deviceId.toLowerCase().includes(q)) ||
+          t.categoryName.toLowerCase().includes(q)
+        );
+      });
+    }
+
+    return [...list].sort((a, b) => {
+      if (techSortOrder === 'id_asc') {
+        return getNumericIdVal(a.technicianCode || a.id) - getNumericIdVal(b.technicianCode || b.id);
+      }
+      if (techSortOrder === 'id_desc') {
+        return getNumericIdVal(b.technicianCode || b.id) - getNumericIdVal(a.technicianCode || a.id);
+      }
+      return a.fullName.localeCompare(b.fullName);
+    });
+  }, [technicians, searchQuery, techSortOrder]);
 
   // Filter Blocked Devices
   const filteredBlockedDevices = useMemo(() => {
@@ -402,18 +471,29 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
       {/* ========================================================================= */}
       {activeDirectoryTab === 'customers' && (
         <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
-          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+          <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 flex-wrap gap-2">
             <div className="flex items-center gap-2">
               <span className="p-1 rounded-lg bg-blue-100 text-blue-700">
                 <Users size={16} />
               </span>
               <h2 className="text-sm font-bold text-slate-900">
-                Customer Entries & Device Tracking ({filteredCustomers.length})
+                Customer Directory ({filteredCustomers.length})
               </h2>
             </div>
-            <span className="text-[11px] text-slate-500 font-mono">
-              Auto IP & Device Capture Active
-            </span>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-xs font-semibold text-slate-500">Sort by:</label>
+              <select
+                value={customerSortOrder}
+                onChange={(e) => setCustomerSortOrder(e.target.value as any)}
+                className="px-2.5 py-1 text-xs bg-white border border-slate-200 rounded-lg font-semibold text-slate-700 outline-none cursor-pointer"
+              >
+                <option value="id_asc">Customer ID (CUST-1, CUST-2...)</option>
+                <option value="id_desc">Customer ID (High to Low)</option>
+                <option value="recent">Most Recent Active</option>
+                <option value="name">Customer Name (A-Z)</option>
+              </select>
+            </div>
           </div>
 
           {filteredCustomers.length === 0 ? (
@@ -511,35 +591,58 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
 
                       {/* Action Button */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
-                        {cust.isBlocked ? (
-                          <button
-                            type="button"
-                            onClick={() => handleUnblock(cust.customerId, 'customer', cust.name)}
-                            className="py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 ml-auto cursor-pointer"
-                          >
-                            <Unlock size={12} />
-                            <span>Unblock</span>
-                          </button>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() =>
-                              handleOpenBlockModal({
-                                targetType: 'customer',
-                                targetId: cust.id,
-                                uniqueId: cust.customerId,
-                                name: cust.name,
-                                phone: cust.phone,
-                                ipAddress: cust.ipAddress,
-                                deviceId: cust.deviceId,
-                              })
-                            }
-                            className="py-1.5 px-3 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1 ml-auto cursor-pointer"
-                          >
-                            <Ban size={12} />
-                            <span>Block User</span>
-                          </button>
-                        )}
+                        <div className="flex items-center justify-end gap-1.5">
+                          {cust.phone && (
+                            <>
+                              <a
+                                href={`tel:${cust.phone.startsWith('+') ? cust.phone : '+91' + cust.phone.replace(/\D/g, '').slice(-10)}`}
+                                className="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 rounded-lg transition-colors cursor-pointer"
+                                title={`Call ${cust.name} (${cust.phone})`}
+                              >
+                                <Phone size={12} />
+                              </a>
+                              <a
+                                href={`https://wa.me/91${cust.phone.replace(/\D/g, '').slice(-10)}`}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-200 rounded-lg transition-colors cursor-pointer"
+                                title={`WhatsApp ${cust.name} (${cust.phone})`}
+                              >
+                                <MessageSquare size={12} />
+                              </a>
+                            </>
+                          )}
+
+                          {cust.isBlocked ? (
+                            <button
+                              type="button"
+                              onClick={() => handleUnblock(cust.customerId, 'customer', cust.name)}
+                              className="py-1 px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Unlock size={11} />
+                              <span>Unblock</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleOpenBlockModal({
+                                  targetType: 'customer',
+                                  targetId: cust.id,
+                                  uniqueId: cust.customerId,
+                                  name: cust.name,
+                                  phone: cust.phone,
+                                  ipAddress: cust.ipAddress,
+                                  deviceId: cust.deviceId,
+                                })
+                              }
+                              className="py-1 px-2.5 bg-red-50 hover:bg-red-600 text-red-600 hover:text-white border border-red-200 hover:border-red-600 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
+                            >
+                              <Ban size={11} />
+                              <span>Block</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}

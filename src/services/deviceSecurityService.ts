@@ -381,13 +381,15 @@ class DeviceSecurityService {
   async checkDeviceBlocked(): Promise<DeviceSecurityStatus> {
     const deviceId = this.getDeviceId();
     const ip = await this.getRealIPAddress();
+    const defaultBlockedMessage = "Your account/device has been blocked by Admin. Access denied until unblocked.";
 
     // 1. Check local blacklist cache for instant zero-latency freeze
     const localBlock = storageService.isDeviceOrIpBlocked(deviceId, ip);
     if (localBlock) {
+      storageService.clearSession();
       return {
         isBlocked: true,
-        reason: localBlock.reason,
+        reason: defaultBlockedMessage,
         blockedAt: localBlock.blockedAt,
         blockedBy: localBlock.blockedBy,
         uniqueId: localBlock.uniqueId,
@@ -416,17 +418,20 @@ class DeviceSecurityService {
             uniqueId: item.unique_id || 'UNKNOWN',
             targetName: item.target_name || 'Restricted Device',
             targetPhone: item.target_phone,
-            reason: item.reason || 'Restricted by NeedFix Security Protocol',
+            reason: defaultBlockedMessage,
             blockedBy: item.blocked_by || 'Admin',
             blockedAt: item.blocked_at || new Date().toISOString(),
           };
+
+          // Clear session immediately upon block detection
+          storageService.clearSession();
 
           // Cache in local storage for persistent lock
           storageService.addBlockedDevice(record);
 
           return {
             isBlocked: true,
-            reason: record.reason,
+            reason: defaultBlockedMessage,
             blockedAt: record.blockedAt,
             blockedBy: record.blockedBy,
             uniqueId: record.uniqueId,
@@ -587,13 +592,33 @@ class DeviceSecurityService {
         } else {
           await supabase
             .from('technicians')
-            .update({ is_blocked: false, blocked_reason: null, blocked_at: null })
+            .update({ status: 'approved', is_blocked: false, blocked_reason: null, blocked_at: null })
             .or(`technician_code.eq.${params.uniqueId},id.eq.${params.uniqueId}`);
         }
+
+        // Restore user status to approved in users table
+        await supabase
+          .from('users')
+          .update({ status: 'approved', is_blocked: false, blocked_reason: null })
+          .or(`id.eq.${params.uniqueId},username.ilike.${params.uniqueId}`);
       } catch (err) {
         console.warn('Supabase unblockUser exception:', err);
       }
     }
+
+    // Also update any matching local user
+    try {
+      const localUsers = storageService.getUsers();
+      const matched = localUsers.find(
+        (u) => u.id === params.uniqueId || u.username.toLowerCase() === params.uniqueId.toLowerCase()
+      );
+      if (matched) {
+        matched.isBlocked = false;
+        (matched as any).status = 'approved';
+        matched.blockedReason = undefined;
+        storageService.updateUser(matched);
+      }
+    } catch {}
 
     return true;
   }

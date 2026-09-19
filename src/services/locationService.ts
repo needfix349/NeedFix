@@ -416,6 +416,65 @@ export function calculateDistanceKm(
   return Math.round(distance * 10) / 10; // 1 decimal place
 }
 
+/**
+ * get_nearby_technicians
+ * Filters technicians strictly within the selected radius (Min: 1 KM, Max: 20 KM, Default: 5 KM)
+ * from the user's location, sorted by proximity (nearest first).
+ */
+export function get_nearby_technicians<
+  T extends {
+    location: { latitude: number; longitude: number };
+    status?: string;
+    isBlocked?: boolean;
+  }
+>(
+  technicians: T[],
+  userLatitude: number,
+  userLongitude: number,
+  radiusKm: number = 5
+): (T & { calculatedDistanceKm: number })[] {
+  // Enforce strict boundaries (Min: 1 KM, Max: 20 KM, Default: 5 KM)
+  const safeRadius = Math.max(1, Math.min(20, typeof radiusKm === 'number' && !isNaN(radiusKm) ? radiusKm : 5));
+
+  return technicians
+    .filter((tech) => {
+      // Must be approved and unblocked
+      if (tech.status && tech.status !== 'approved') return false;
+      if (tech.isBlocked) return false;
+      if (
+        !tech.location ||
+        typeof tech.location.latitude !== 'number' ||
+        typeof tech.location.longitude !== 'number'
+      ) {
+        return false;
+      }
+      const dist = calculateDistanceKm(
+        userLatitude,
+        userLongitude,
+        tech.location.latitude,
+        tech.location.longitude
+      );
+      // Strictly within the selected radius
+      return dist <= safeRadius;
+    })
+    .map((tech) => {
+      const dist = calculateDistanceKm(
+        userLatitude,
+        userLongitude,
+        tech.location.latitude,
+        tech.location.longitude
+      );
+      return {
+        ...tech,
+        calculatedDistanceKm: dist,
+      };
+    })
+    .sort((a, b) => a.calculatedDistanceKm - b.calculatedDistanceKm);
+}
+
+// Alias export for camelCase consumers
+export const getNearbyTechnicians = get_nearby_technicians;
+
 // Reverse geocode GPS coordinates to address (Zero external API cost)
 export async function reverseGeocodeCoordinates(
   latitude: number,

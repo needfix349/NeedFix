@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import {
   X,
   Star,
@@ -17,6 +18,8 @@ import {
   ExternalLink,
   Lock,
   Image as ImageIcon,
+  Copy,
+  Check,
 } from 'lucide-react';
 import { TechnicianProfile, UserLocation, Review, UserProfile } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -158,179 +161,127 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
     setReviewComment('');
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200 overflow-x-hidden max-w-full">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1.5rem)] sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col relative box-border">
-        {/* Top Cover Banner */}
-        <div className="h-32 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 relative p-4 shrink-0">
-          <div className="absolute top-4 right-4 flex items-center gap-2">
+  const modalContent = (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-xs animate-in fade-in duration-200 overflow-x-hidden max-w-full">
+      <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 w-full max-w-[calc(100vw-1rem)] sm:max-w-3xl max-h-[92vh] overflow-hidden flex flex-col relative box-border my-auto">
+        {/* Top Cover Banner - 50% Reduced Height */}
+        <div className="h-9 sm:h-11 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-900 relative px-3 py-1.5 shrink-0 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            {copiedLink && (
+              <span className="bg-white/95 text-slate-900 px-2 py-0.5 rounded-full text-[11px] font-bold shadow-sm animate-in fade-in">
+                Link Copied!
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-1.5 ml-auto">
             <button
               onClick={handleShare}
-              className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors"
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors cursor-pointer"
               title="Share profile"
             >
-              <Share2 size={16} />
+              <Share2 size={14} />
             </button>
             <button
               onClick={() => onToggleFavorite(technician.id)}
-              className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors"
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors cursor-pointer"
               title="Favorite"
             >
-              <Heart size={16} className={isFavorite ? 'fill-red-500 text-red-500' : ''} />
+              <Heart size={14} className={isFavorite ? 'fill-red-500 text-red-500' : ''} />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors"
+              className="p-1 rounded-full bg-black/30 hover:bg-black/50 text-white backdrop-blur-xs transition-colors cursor-pointer"
             >
-              <X size={18} />
+              <X size={15} />
             </button>
           </div>
-
-          {copiedLink && (
-            <div className="absolute top-4 left-4 bg-white/95 text-slate-900 px-3 py-1 rounded-full text-xs font-bold shadow-lg animate-in fade-in">
-              Profile Link Copied!
-            </div>
-          )}
         </div>
 
-        {/* Profile Card Overlay */}
-        <div className="px-6 pb-2 -mt-14 shrink-0 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-100">
-          <div className="flex items-end gap-4">
-            <div className="relative">
+        {/* Compact Profile Header Block */}
+        <div className="px-4 pb-2.5 pt-0 shrink-0 border-b border-slate-100 bg-white">
+          <div className="flex items-start gap-3">
+            <div className="relative shrink-0 -mt-5 sm:-mt-6">
               <img
                 src={technician.profilePhotoUrl}
                 alt={technician.fullName}
-                className="w-24 h-24 rounded-3xl object-cover border-4 border-white shadow-xl bg-white"
+                className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl object-cover border-2 border-white shadow-md bg-white"
               />
               {technician.isOnline && (
                 <span
                   title="Available for immediate booking"
-                  className="absolute bottom-1 right-1 w-5 h-5 bg-emerald-500 border-2 border-white rounded-full shadow-xs"
+                  className="absolute bottom-0 right-0 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full shadow-xs"
                 />
               )}
             </div>
 
-            <div className="pb-1">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-xl font-bold font-display text-slate-900">
+            <div className="pt-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h2 className="text-sm sm:text-base font-bold font-display text-slate-900 leading-tight">
                   {technician.companyName || technician.fullName}
                 </h2>
-                {technician.isVerified && <VerifiedBadge size="md" showText={true} />}
-              </div>
-              {technician.companyName && technician.fullName !== technician.companyName && (
-                <p className="text-xs font-semibold text-slate-600">{technician.fullName}</p>
-              )}
-              <div className="flex items-center gap-2 mt-2 text-xs text-slate-500 flex-wrap">
-                {(technician.categoryIds && technician.categoryIds.length > 0
-                  ? technician.categoryIds
-                  : [technician.categoryId]
-                ).map((catId) => {
-                  const catObj = SERVICE_CATEGORIES.find((c) => c.id === catId);
-                  return (
-                    <span
-                      key={catId}
-                      className="font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg flex items-center gap-1.5 border border-blue-200/60"
-                    >
-                      <CategoryLogo
-                        categoryId={catId}
-                        size="xs"
-                        className="w-4 h-4 shrink-0"
-                      />
-                      <span>{catObj?.name || technician.categoryName}</span>
-                    </span>
-                  );
-                })}
-                {distanceKm !== null && (
-                  <span className="text-emerald-700 font-bold bg-emerald-50 px-2 py-1 rounded-lg flex items-center gap-0.5">
-                    <MapPin size={11} /> {distanceKm} km from you
+                {technician.isVerified && (
+                  <span className="inline-flex items-center gap-0.5 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.2 rounded-full">
+                    <CheckCircle2 size={11} className="text-emerald-600 fill-emerald-100" />
+                    Verified
                   </span>
                 )}
               </div>
-            </div>
-          </div>
 
-          {/* Availability Status */}
-          <div className="sm:text-right pb-2">
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
-              Direct Contact
-            </span>
-            <span className="inline-flex items-center gap-1.5 mt-1 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-              {technician.isOnline ? 'Available Now' : 'Accepting Inquiries'}
-            </span>
+              {technician.companyName && technician.fullName !== technician.companyName && (
+                <p className="text-[11px] text-slate-500 leading-tight">{technician.fullName}</p>
+              )}
+
+              {/* Category Badge & Distance */}
+              <div className="flex items-center gap-1.5 mt-1 text-xs text-slate-500 flex-wrap">
+                <span className="font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md flex items-center gap-1 border border-blue-200/60 text-[10px]">
+                  <CategoryLogo
+                    categoryId={technician.categoryId}
+                    size="xs"
+                    className="w-3 h-3 shrink-0"
+                  />
+                  <span>{technician.categoryName}</span>
+                </span>
+                {distanceKm !== null && (
+                  <span className="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded-md flex items-center gap-1 text-[10px] border border-emerald-100">
+                    <MapPin size={10} /> {distanceKm} km from you
+                  </span>
+                )}
+              </div>
+
+              {/* Sleek Minimalist ID Line + Report Link */}
+              <div className="flex items-center gap-2 mt-1 text-xs text-slate-500 flex-wrap">
+                <span className="inline-flex items-center gap-1 font-mono text-[10px] font-semibold text-slate-700 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
+                  <span>ID: {techCode}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (navigator.clipboard) {
+                        navigator.clipboard.writeText(techCode);
+                        setCopiedTechCode(true);
+                        setTimeout(() => setCopiedTechCode(false), 2000);
+                      }
+                    }}
+                    className="p-0.5 text-slate-400 hover:text-slate-700 cursor-pointer"
+                    title="Copy Technician ID"
+                  >
+                    {copiedTechCode ? <Check size={10} className="text-emerald-600" /> : <Copy size={10} />}
+                  </button>
+                </span>
+                <span className="text-slate-300">•</span>
+                <a
+                  href={`mailto:needfix349@gmail.com?subject=Complaint%20regarding%20Technician%20ID%20${encodeURIComponent(techCode)}%20(${encodeURIComponent(technician.fullName)})&body=Dear%20NeedFix%20Admin%2C%0A%0AI%20am%20submitting%20a%20complaint%20regarding%20Technician%20ID%3A%20${encodeURIComponent(techCode)}%20(${encodeURIComponent(technician.fullName)})%0AIssue%3A%0A`}
+                  className="text-[10px] font-semibold text-rose-600 hover:text-rose-700 hover:underline"
+                >
+                  Report / Complain
+                </a>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Scrollable Body Content */}
-        <div className="p-6 overflow-y-auto space-y-6 flex-1 text-slate-800">
-          {/* Official Technician ID & Admin Complaint Card */}
-          <div className="bg-slate-900 text-white rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md border border-slate-700">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-slate-950 font-mono font-extrabold flex items-center justify-center shrink-0 text-sm shadow-xs">
-                ID
-              </div>
-              <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-slate-300 font-medium">Technician ID Number:</span>
-                  <span className="text-sm font-mono font-bold text-amber-300 tracking-wider bg-slate-800 px-2 py-0.5 rounded border border-slate-700">
-                    {techCode}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-400 mt-0.5">
-                  Keep this ID number safe. You can report or complain to NeedFix Admin using this ID.
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
-              <button
-                type="button"
-                onClick={() => {
-                  if (navigator.clipboard) {
-                    navigator.clipboard.writeText(techCode);
-                    setCopiedTechCode(true);
-                    setTimeout(() => setCopiedTechCode(false), 2500);
-                  }
-                }}
-                className="flex-1 sm:flex-none py-2 px-3 bg-slate-800 hover:bg-slate-700 active:scale-95 text-white rounded-xl text-xs font-bold border border-slate-600 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
-                title="Copy Technician ID"
-              >
-                <FileText size={13} className="text-amber-400" />
-                <span>{copiedTechCode ? 'Copied ID!' : 'Copy ID'}</span>
-              </button>
-
-              <a
-                href={`mailto:needfix349@gmail.com?subject=Complaint%20regarding%20Technician%20ID%20${encodeURIComponent(techCode)}%20(${encodeURIComponent(technician.fullName)})&body=Dear%20NeedFix%20Admin%2C%0A%0AI%20am%20a%20NeedFix%20customer%20submitting%20a%20complaint%20regarding%20this%20service%20provider%3A%0A%0A-%20Technician%20ID%3A%20${encodeURIComponent(techCode)}%0A-%20Technician%20Name%3A%20${encodeURIComponent(technician.fullName)}%0A-%20Service%20Trade%3A%20${encodeURIComponent(technician.categoryName)}%0A-%20Technician%20Phone%3A%20${encodeURIComponent(technician.mobile)}%0A%0ADescription%20of%20Complaint%20%2F%20Issue%3A%0A`}
-                className="flex-1 sm:flex-none py-2 px-3 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
-                title="File a complaint to Admin regarding this technician"
-              >
-                <span>Complain to Admin</span>
-              </a>
-            </div>
-          </div>
-
-          {/* Verification Badge & Guarantee Seal */}
-          {technician.isVerified && (
-            <div className="bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-300/80 rounded-2xl p-4 flex items-start gap-3 shadow-xs">
-              <div className="p-2 bg-emerald-600 text-white rounded-xl shadow-xs shrink-0">
-                <ShieldCheck size={20} />
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs font-bold text-emerald-950 uppercase tracking-wider">
-                    NeedFix Verified Service Provider
-                  </h4>
-                  <span className="text-[10px] bg-emerald-200/80 text-emerald-900 px-2 py-0.2 rounded-full font-bold">
-                    Admin Approved
-                  </span>
-                </div>
-                <p className="text-xs text-emerald-900/90 mt-0.5 leading-relaxed">
-                  Identity and background verified via National ID Aadhaar Card {technician.documents?.aadhaarNumber && /^\d{4}/.test(technician.documents.aadhaarNumber) ? `(${technician.documents.aadhaarNumber.slice(0, 4)}...${technician.documents.aadhaarNumber.slice(-4)})` : 'Document'}. Reviewed and authorized by NeedFix platform administrators.
-                </p>
-              </div>
-            </div>
-          )}
-
+        <div className="p-5 overflow-y-auto space-y-5 flex-1 text-slate-800">
           {/* Quick Specifications Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
@@ -613,15 +564,15 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
         </div>
 
         {/* STICKY BOTTOM ACTION BAR: Direct Contact Actions Only (Call & WhatsApp) */}
-        <div className="p-4 bg-white border-t border-slate-200 shadow-2xl shrink-0 grid grid-cols-2 gap-3">
+        <div className="p-2.5 sm:p-3 bg-white border-t border-slate-200 shadow-xl shrink-0 grid grid-cols-2 gap-2 sm:gap-3">
           {/* Direct Call Action Button */}
           <button
             type="button"
             onClick={handleCall}
-            className="py-3.5 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/25 cursor-pointer"
+            className="py-2.5 sm:py-3 px-3.5 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 cursor-pointer"
             title="Call Technician Directly"
           >
-            <Phone size={17} />
+            <Phone size={15} />
             <span>Direct Call</span>
           </button>
 
@@ -629,14 +580,19 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
           <button
             type="button"
             onClick={handleWhatsApp}
-            className="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/25 cursor-pointer"
+            className="py-2.5 sm:py-3 px-3.5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white rounded-xl sm:rounded-2xl text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer"
             title="Direct WhatsApp Chat"
           >
-            <MessageSquare size={17} />
+            <MessageSquare size={15} />
             <span>WhatsApp Chat</span>
           </button>
         </div>
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

@@ -15,6 +15,7 @@ import {
   EyeOff,
 } from 'lucide-react';
 import { UserProfile } from '../../types';
+import { storageService } from '../../services/storage';
 import { accountService, STANDARD_SECURITY_QUESTIONS } from '../../services/accountService';
 
 interface UnifiedAuthModalProps {
@@ -103,7 +104,12 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
         notifySuccess(res.user, false);
         onClose();
       } else {
-        setErrorMessage(res.message || 'Login failed. Please check your credentials.');
+        if (res.isBlocked) {
+          storageService.clearSession();
+          setErrorMessage("Your account/device has been blocked by Admin. Access denied until unblocked.");
+        } else {
+          setErrorMessage(res.message || 'Login failed. Please check your credentials.');
+        }
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Login error. Please try again.');
@@ -143,7 +149,12 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
         notifySuccess(res.user, true);
         onClose();
       } else {
-        setErrorMessage(res.message || 'Registration failed.');
+        if (res.isBlocked) {
+          storageService.clearSession();
+          setErrorMessage("Your account/device has been blocked by Admin. Access denied until unblocked.");
+        } else {
+          setErrorMessage(res.message || 'Registration failed.');
+        }
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to create account.');
@@ -200,7 +211,12 @@ export const UnifiedAuthModal: React.FC<UnifiedAuthModalProps> = ({
           setRecConfirmPassword('');
         }, 1500);
       } else {
-        setErrorMessage(res.message || 'Recovery failed. Verify your PIN or contact Admin.');
+        if (res.isBlocked) {
+          storageService.clearSession();
+          setErrorMessage("Your account/device has been blocked by Admin. Access denied until unblocked.");
+        } else {
+          setErrorMessage(res.message || 'Recovery failed. Verify your PIN or contact Admin.');
+        }
       }
     } catch (err: any) {
       setErrorMessage(err?.message || 'Error recovering password.');

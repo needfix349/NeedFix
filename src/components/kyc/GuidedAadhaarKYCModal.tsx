@@ -935,7 +935,7 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
                       type="text"
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Amit Kumar"
+                      placeholder="e.g. Rahul"
                       className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-9 pr-3.5 py-2.5 text-xs font-semibold text-white outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
                     />
                   </div>

@@ -20,6 +20,7 @@ import {
   ArrowLeft,
   HelpCircle,
   Mail,
+  Trash2,
 } from 'lucide-react';
 import { UserProfile, TechnicianProfile, UserLocation } from '../../types';
 import { VerifiedBadge } from '../common/VerifiedBadge';
@@ -28,6 +29,7 @@ import { NeedFixAppIcon } from '../common/NeedFixAppIcon';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { EditProfileModal } from '../common/EditProfileModal';
+import { DeleteAccountModal } from '../common/DeleteAccountModal';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -64,6 +66,7 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [isLocatingGPS, setIsLocatingGPS] = useState(false);
   const [gpsNotification, setGpsNotification] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
@@ -416,10 +419,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                         onLogout();
                         setShowProfileMenu(false);
                       }}
-                      className="w-full text-left p-2 hover:bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-xs font-bold transition-colors"
+                      className="w-full text-left p-2 hover:bg-red-50 text-red-600 rounded-xl flex items-center gap-2 text-xs font-bold transition-colors cursor-pointer"
                     >
                       <LogOut size={14} />
                       <span>Log Out</span>
+                    </button>
+                    <button
+                      type="button"
+                      id="navbar-delete-account-btn"
+                      onClick={() => {
+                        setShowProfileMenu(false);
+                        setShowDeleteAccountModal(true);
+                      }}
+                      className="w-full text-left p-2 hover:bg-rose-50 text-rose-600 rounded-xl flex items-center gap-2 text-xs font-bold transition-colors cursor-pointer"
+                    >
+                      <Trash2 size={14} className="text-rose-600" />
+                      <span>Delete Account</span>
                     </button>
                   </div>
                 </div>
@@ -464,6 +479,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             if (onUpdateUser) {
               onUpdateUser(updated);
             }
+          }}
+        />
+      )}
+
+      {showDeleteAccountModal && currentUser && (
+        <DeleteAccountModal
+          isOpen={showDeleteAccountModal}
+          onClose={() => setShowDeleteAccountModal(false)}
+          currentUser={currentUser}
+          onAccountDeleted={() => {
+            setShowDeleteAccountModal(false);
+            onLogout();
           }}
         />
       )}
