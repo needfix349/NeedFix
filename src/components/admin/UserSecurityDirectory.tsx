@@ -93,7 +93,11 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
       setBlockedDevices(storageService.getBlockedDevices());
       setResetRequests(storageService.getPasswordResetRequests());
     });
-    return unsub;
+    const interval = setInterval(loadDirectoryData, 5000);
+    return () => {
+      unsub();
+      clearInterval(interval);
+    };
   }, []);
 
   const handleCopyId = (id: string) => {

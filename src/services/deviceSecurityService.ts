@@ -345,6 +345,15 @@ class DeviceSecurityService {
     // Save locally
     storageService.saveCustomer(customerRecord);
 
+    // Sync to Central Server API
+    try {
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerRecord),
+      }).catch((e) => console.warn('API /api/customers sync error:', e));
+    } catch {}
+
     // Sync to Supabase PostgreSQL 'customers' table
     if (isSupabaseConfigured()) {
       try {
@@ -624,51 +633,113 @@ class DeviceSecurityService {
   }
 
   /**
-   * 9. Fetch all customers from Supabase + Local Cache
+   * 9. Fetch all customers from Central Server + Supabase + Local Cache
    */
   async getAllCustomers(): Promise<CustomerRecord[]> {
-    const localList = storageService.getCustomers();
+    let combined: CustomerRecord[] = [...storageService.getCustomers()];
 
+    // 1. Fetch from Central Persistent Server API
+    try {
+      const apiRes = await fetch('/api/customers');
+      if (apiRes.ok) {
+        const apiCusts: CustomerRecord[] = await apiRes.json();
+        if (Array.isArray(apiCusts)) {
+          const map = new Map<string, CustomerRecord>();
+          combined.forEach((c) => map.set(c.id || c.customerId, c));
+          apiCusts.forEach((c) => map.set(c.id || c.customerId, { ...map.get(c.id || c.customerId), ...c }));
+          combined = Array.from(map.values());
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API /api/customers fetch notice:', apiErr);
+    }
+
+    // 2. Fetch from Supabase PostgreSQL users table (all registered customers)
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
-          .from('customers')
+        const { data: suUsers } = await supabase
+          .from('users')
           .select('*')
-          .order('last_seen_at', { ascending: false });
+          .eq('role', 'customer');
 
-        if (!error && data) {
-          const mapped: CustomerRecord[] = data.map((d: any) => ({
-            id: d.id,
-            customerId: d.customer_id || 'CUST-0000',
-            name: d.name || 'NeedFix Customer',
-            phone: d.phone || '',
-            ipAddress: d.ip_address || '127.0.0.1',
-            deviceId: d.device_id || 'DEV-UNKNOWN',
-            userAgent: d.user_agent,
-            lastSeenAt: d.last_seen_at || d.created_at || new Date().toISOString(),
-            createdAt: d.created_at || new Date().toISOString(),
-            isBlocked: Boolean(d.is_blocked),
-            blockedReason: d.blocked_reason,
-            blockedAt: d.blocked_at,
-          }));
+        if (suUsers && suUsers.length > 0) {
+          const existingIds = new Set(combined.map((c) => c.userId || c.id));
+          const existingNames = new Set(combined.map((c) => c.name.toLowerCase()));
 
-          // Merge with local list
-          const remoteIds = new Set(mapped.map((c) => c.customerId));
-          const combined = [...mapped];
-          for (const lc of localList) {
-            if (!remoteIds.has(lc.customerId)) {
-              combined.push(lc);
+          for (const u of suUsers) {
+            if (!existingIds.has(u.id) && !existingNames.has((u.name || '').toLowerCase())) {
+              let maxNum = 0;
+              combined.forEach((c) => {
+                const m = c.customerId?.match(/CUST-(\d+)/i);
+                if (m && m[1]) {
+                  const num = parseInt(m[1], 10);
+                  if (!isNaN(num) && num > maxNum) maxNum = num;
+                }
+              });
+              const newRec: CustomerRecord = {
+                id: `cust_${u.id}`,
+                customerId: `CUST-${maxNum + 1}`,
+                userId: u.id,
+                name: u.name || 'NeedFix Customer',
+                phone: '',
+                ipAddress: '127.0.0.1',
+                deviceId: u.installation_id || 'DEV-CUSTOMER',
+                userAgent: '',
+                lastSeenAt: u.created_at || new Date().toISOString(),
+                createdAt: u.created_at || new Date().toISOString(),
+                isBlocked: u.status === 'blocked',
+              };
+              combined.push(newRec);
             }
           }
-          storageService.setCustomers(combined);
-          return combined;
         }
       } catch (err) {
-        console.warn('Supabase getAllCustomers exception:', err);
+        console.warn('Supabase getAllCustomers users query exception:', err);
       }
     }
 
-    return localList;
+    // 3. Reconcile any local users who are customers
+    const localUsers = storageService.getUsers().filter((u) => u.role === 'customer');
+    for (const lu of localUsers) {
+      const exists = combined.some(
+        (c) => (c.userId && c.userId === lu.id) || (lu.username && c.id.includes(lu.id)) || c.name.toLowerCase() === lu.name.toLowerCase()
+      );
+      if (!exists) {
+        let maxNum = 0;
+        combined.forEach((c) => {
+          const m = c.customerId?.match(/CUST-(\d+)/i);
+          if (m && m[1]) {
+            const num = parseInt(m[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        });
+        const rec: CustomerRecord = {
+          id: `cust_${lu.id}`,
+          customerId: `CUST-${maxNum + 1}`,
+          userId: lu.id,
+          name: lu.name,
+          phone: lu.mobile || '',
+          ipAddress: '127.0.0.1',
+          deviceId: lu.installationId || 'DEV-LOCAL',
+          userAgent: '',
+          lastSeenAt: lu.createdAt || new Date().toISOString(),
+          createdAt: lu.createdAt || new Date().toISOString(),
+          isBlocked: lu.isBlocked || (lu as any).status === 'blocked',
+        };
+        combined.push(rec);
+      }
+    }
+
+    // Ensure all customer IDs are numbered sequentially if missing
+    let nextIdx = 1;
+    for (const c of combined) {
+      if (!c.customerId || !c.customerId.startsWith('CUST-')) {
+        c.customerId = `CUST-${nextIdx++}`;
+      }
+    }
+
+    storageService.setCustomers(combined);
+    return combined;
   }
 
   /**

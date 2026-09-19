@@ -215,21 +215,65 @@ class AccountService {
     storageService.updateUser(newUser);
     storageService.setCurrentUser(newUser);
 
-    // Sync to Supabase PostgreSQL if configured
+    // Also register in Customers Directory
+    try {
+      const allCusts = storageService.getCustomers();
+      let maxNum = 0;
+      allCusts.forEach((c) => {
+        if (c.customerId) {
+          const m = c.customerId.match(/CUST-(\d+)/i);
+          if (m && m[1]) {
+            const num = parseInt(m[1], 10);
+            if (!isNaN(num) && num > maxNum) maxNum = num;
+          }
+        }
+      });
+      const customerId = `CUST-${maxNum + 1}`;
+      const customerRecord = {
+        id: `cust_${newUser.id}`,
+        customerId,
+        userId: newUser.id,
+        name: cleanName,
+        phone: params.phone?.trim() || '',
+        ipAddress: '127.0.0.1',
+        deviceId: installationId,
+        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        lastSeenAt: new Date().toISOString(),
+        createdAt: newUser.createdAt,
+        isBlocked: false,
+      };
+      storageService.saveCustomer(customerRecord);
+
+      // Persist to Central Server API
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerRecord),
+      }).catch((err) => console.warn('API /api/customers post error:', err));
+
+      fetch('/api/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser),
+      }).catch((err) => console.warn('API /api/users post error:', err));
+    } catch (e) {
+      console.warn('Error saving customer directory record:', e);
+    }
+
+    // Sync to Supabase PostgreSQL users table with valid schema
     if (isSupabaseConfigured()) {
       try {
         await supabase.from('users').upsert({
           id: newUser.id,
           username: cleanUsername,
           name: newUser.name,
-          mobile: newUser.mobile,
-          country_code: newUser.countryCode,
-          role: newUser.role,
-          created_at: newUser.createdAt,
+          password_hash: passwordHash,
+          security_pin: cleanPin,
+          role: 'customer',
+          status: 'approved',
+          radius_km: 5,
           installation_id: installationId,
-          security_pin_hash: securityPinHash,
-          search_radius_km: 5,
-          security_questions: secConfig ? JSON.stringify(secConfig) : null,
+          created_at: newUser.createdAt,
         }, { onConflict: 'username' });
       } catch (e) {
         console.warn('Supabase registerUser warning:', e);

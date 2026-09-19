@@ -128,7 +128,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   useEffect(() => {
     loadData();
     const unsubscribe = storageService.subscribe(loadData);
-    return unsubscribe;
+    // Auto-poll every 5 seconds so registrations from other phones/tabs sync live
+    const interval = setInterval(loadData, 5000);
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
   useEffect(() => {
@@ -170,6 +175,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         setCurrentUser(result.user);
         if (onUserChange) onUserChange(result.user);
         setLoginSuccessMessage(result.message || 'Administrator authenticated successfully.');
+        loadData();
       } else {
         setLoginError(result.message || 'Invalid administrator credentials. Please check email & password.');
       }

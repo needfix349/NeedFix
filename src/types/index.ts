@@ -223,6 +223,7 @@ export interface AdminAuditLog {
 export interface CustomerRecord {
   id: string;
   customerId: string; // 'CUST-XXXX'
+  userId?: string;
   name: string;
   phone?: string;
   ipAddress: string;
