@@ -1,6 +1,6 @@
-// NeedFix Service Worker - Offline Caching & PWA Engine
-const CACHE_STATIC_NAME = 'needfix-static-v2';
-const CACHE_DYNAMIC_NAME = 'needfix-dynamic-v2';
+// NeedFix Service Worker - High Reliability Offline Caching & PWA Engine
+const CACHE_STATIC_NAME = 'needfix-static-v5';
+const CACHE_DYNAMIC_NAME = 'needfix-dynamic-v5';
 
 const STATIC_ASSETS = [
   '/',
@@ -12,6 +12,7 @@ const STATIC_ASSETS = [
   '/favicon-192.png',
   '/favicon.svg',
   '/apple-touch-icon.png',
+  '/logo.png',
   '/needfix-logo.png',
   '/needfix-squircle.png',
 ];
@@ -85,31 +86,32 @@ const OFFLINE_FALLBACK_HTML = `
       </svg>
     </div>
     <h1>You are currently offline</h1>
-    <p>NeedFix saved local data and verified technician contacts remain accessible offline. Please check your internet connection and tap retry.</p>
+    <p>NeedFix local records and verified technician contacts remain accessible offline. Please check your internet connection and tap retry.</p>
     <button class="btn" onclick="window.location.reload()">Retry Connection</button>
   </div>
 </body>
 </html>
 `;
 
-// 1. Install Event: Cache Core Static Assets
+// 1. Install Event: Cache Core Static Assets safely
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_STATIC_NAME).then((cache) => {
       return cache.addAll(STATIC_ASSETS).catch((err) => {
-        console.warn('[Service Worker] Static assets pre-cache partial notice:', err);
+        console.warn('[Service Worker] Static assets pre-cache note:', err);
       });
     }).then(() => self.skipWaiting())
   );
 });
 
-// 2. Activate Event: Clean old caches & Claim clients immediately
+// 2. Activate Event: Clean ALL old caches immediately & Claim clients
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keyList) => {
       return Promise.all(
         keyList.map((key) => {
           if (key !== CACHE_STATIC_NAME && key !== CACHE_DYNAMIC_NAME) {
+            console.log('[NeedFix Service Worker] Deleting obsolete cache:', key);
             return caches.delete(key);
           }
         })
@@ -118,26 +120,34 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Fetch Event: Network-First for APIs/Dynamic data with Offline Fallback
+// 3. Fetch Event: Safe Network-First Strategy to prevent broken builds
 self.addEventListener('fetch', (event) => {
   const request = event.request;
-  const url = new URL(request.url);
 
-  // Ignore non-GET requests (e.g. POST uploads)
+  // Ignore non-GET requests
   if (request.method !== 'GET') {
     return;
   }
 
-  // A. Database queries & API calls (e.g. Supabase REST API) -> Network-First with Cache Fallback
+  // Only handle http / https requests
+  if (!request.url.startsWith('http://') && !request.url.startsWith('https://')) {
+    return;
+  }
+
+  const url = new URL(request.url);
+
+  // A. Database queries & API calls (Supabase & backend API) -> Network-First
   if (url.hostname.includes('supabase.co') || url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            const responseClone = networkResponse.clone();
-            caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
-              cache.put(request, responseClone);
-            });
+            try {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              }).catch(() => {});
+            } catch {}
           }
           return networkResponse;
         })
@@ -155,15 +165,19 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // B. Navigation requests (HTML pages) -> Network-First, with cache or offline page fallback
+  // B. Navigation requests (HTML pages) -> Network-First with Cache fallback
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
         .then((networkResponse) => {
-          const responseClone = networkResponse.clone();
-          caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
-            cache.put(request, responseClone);
-          });
+          if (networkResponse && networkResponse.status === 200) {
+            try {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              }).catch(() => {});
+            } catch {}
+          }
           return networkResponse;
         })
         .catch(async () => {
@@ -181,37 +195,66 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // C. Static Assets (CSS, JS, Images, Fonts) -> Cache-First with Network Fallback
+  // C. JavaScript scripts & CSS stylesheets -> Network-First to guarantee latest deploy is loaded
+  if (
+    request.destination === 'script' ||
+    request.destination === 'style' ||
+    url.pathname.endsWith('.js') ||
+    url.pathname.endsWith('.css') ||
+    url.pathname.includes('/assets/')
+  ) {
+    event.respondWith(
+      fetch(request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            try {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              }).catch(() => {});
+            } catch {}
+          }
+          return networkResponse;
+        })
+        .catch(() => caches.match(request))
+    );
+    return;
+  }
+
+  // D. Static Assets (Images, Icons, Fonts) -> Cache-First with Network Revalidation
   event.respondWith(
     caches.match(request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch in background to revalidate cache
+        // Background revalidate
         fetch(request).then((networkResponse) => {
           if (networkResponse && networkResponse.status === 200) {
-            caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
-              cache.put(request, networkResponse);
-            });
+            try {
+              const responseClone = networkResponse.clone();
+              caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
+                cache.put(request, responseClone);
+              }).catch(() => {});
+            } catch {}
           }
         }).catch(() => {});
         return cachedResponse;
       }
 
       return fetch(request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
-          return networkResponse;
+        if (networkResponse && networkResponse.status === 200) {
+          try {
+            const responseClone = networkResponse.clone();
+            caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            }).catch(() => {});
+          } catch {}
         }
-        const responseClone = networkResponse.clone();
-        caches.open(CACHE_DYNAMIC_NAME).then((cache) => {
-          cache.put(request, responseClone);
-        });
         return networkResponse;
       }).catch(async () => {
-        // Fallback for image requests
         if (request.destination === 'image') {
-          const fallbackLogo = await caches.match('/needfix-logo.png');
+          const fallbackLogo = await caches.match('/logo.png');
           if (fallbackLogo) return fallbackLogo;
         }
-        return new Response('Offline resource unavailable', { status: 503, statusText: 'Offline' });
+        return new Response('', { status: 404, statusText: 'Not Found' });
       });
     })
   );

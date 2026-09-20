@@ -395,7 +395,7 @@ class DeviceSecurityService {
     // 1. Check local blacklist cache for instant zero-latency freeze
     const localBlock = storageService.isDeviceOrIpBlocked(deviceId, ip);
     if (localBlock) {
-      storageService.clearSession();
+      storageService.clearSession(true);
       return {
         isBlocked: true,
         reason: defaultBlockedMessage,
@@ -432,11 +432,11 @@ class DeviceSecurityService {
             blockedAt: item.blocked_at || new Date().toISOString(),
           };
 
-          // Clear session immediately upon block detection
-          storageService.clearSession();
+          // Clear session immediately upon block detection (silent)
+          storageService.clearSession(true);
 
-          // Cache in local storage for persistent lock
-          storageService.addBlockedDevice(record);
+          // Cache in local storage for persistent lock (silent)
+          storageService.addBlockedDevice(record, true);
 
           return {
             isBlocked: true,

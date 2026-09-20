@@ -33,6 +33,7 @@ export interface PasswordResetRequest {
   id: string;
   username: string;
   phone: string;
+  registeredPhone?: string;
   status: 'pending' | 'resolved' | 'rejected';
   requestedAt: string;
   resolvedAt?: string;
@@ -217,7 +218,7 @@ export interface AdminAuditLog {
   adminName: string;
   technicianId: string;
   technicianName: string;
-  action: 'approved' | 'rejected' | 'suspended' | 'reactivated';
+  action: 'approved' | 'rejected' | 'suspended' | 'reactivated' | 'blocked';
   reason?: string;
   timestamp: string;
 }

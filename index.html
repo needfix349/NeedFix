@@ -31,7 +31,7 @@
         window.addEventListener('load', function() {
           navigator.serviceWorker.register('/sw.js')
             .then(function(registration) {
-              console.log('[NeedFix PWA] Service Worker active with scope:', registration.scope);
+              registration.update().catch(function() {});
             })
             .catch(function(error) {
               console.warn('[NeedFix PWA] Service Worker registration note:', error);

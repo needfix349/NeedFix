@@ -20,21 +20,21 @@ import {
   ADMIN_PHONE_NUMBER,
 } from '../data/mockData';
 
-const STORAGE_VERSION = 'v9_production';
+const STORAGE_VERSION = 'v10_production';
 const KEYS = {
-  VERSION: 'needfix_storage_ver_v9',
-  CURRENT_USER: 'needfix_v9_current_user',
-  USERS: 'needfix_v9_users',
-  TECHNICIANS: 'needfix_v9_technicians',
-  PENDING_APPLICATIONS: 'needfix_v9_pending_applications',
-  LEADS: 'needfix_v9_leads',
-  REVIEWS: 'needfix_v9_reviews',
-  AUDIT_LOGS: 'needfix_v9_audit_logs',
-  ACTIVITY_LOGS: 'needfix_v9_activity_logs',
-  FAVORITES: 'needfix_v9_favorites',
-  CUSTOMERS: 'needfix_v9_customers',
-  BLOCKED_DEVICES: 'needfix_v9_blocked_devices',
-  PASSWORD_RESET_REQUESTS: 'needfix_v9_password_reset_requests',
+  VERSION: 'needfix_storage_ver_v10',
+  CURRENT_USER: 'needfix_v10_current_user',
+  USERS: 'needfix_v10_users',
+  TECHNICIANS: 'needfix_v10_technicians',
+  PENDING_APPLICATIONS: 'needfix_v10_pending_applications',
+  LEADS: 'needfix_v10_leads',
+  REVIEWS: 'needfix_v10_reviews',
+  AUDIT_LOGS: 'needfix_v10_audit_logs',
+  ACTIVITY_LOGS: 'needfix_v10_activity_logs',
+  FAVORITES: 'needfix_v10_favorites',
+  CUSTOMERS: 'needfix_v10_customers',
+  BLOCKED_DEVICES: 'needfix_v10_blocked_devices',
+  PASSWORD_RESET_REQUESTS: 'needfix_v10_password_reset_requests',
 };
 
 class StorageService {
@@ -45,41 +45,45 @@ class StorageService {
   }
 
   private init() {
-    const currentVer = localStorage.getItem(KEYS.VERSION);
-    if (currentVer !== STORAGE_VERSION) {
-      localStorage.setItem(KEYS.VERSION, STORAGE_VERSION);
-      localStorage.setItem(KEYS.USERS, JSON.stringify([]));
-      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
-      localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
-      localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
-      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
-      localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
-      localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
-      // Remove any legacy mock user session
-      localStorage.removeItem(KEYS.CURRENT_USER);
-      return;
-    }
+    try {
+      const currentVer = localStorage.getItem(KEYS.VERSION);
+      if (currentVer !== STORAGE_VERSION) {
+        localStorage.setItem(KEYS.VERSION, STORAGE_VERSION);
+        localStorage.setItem(KEYS.USERS, JSON.stringify([]));
+        localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
+        localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
+        localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
+        localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
+        localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
+        localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
+        // Remove any legacy mock user session
+        localStorage.removeItem(KEYS.CURRENT_USER);
+        return;
+      }
 
-    if (!localStorage.getItem(KEYS.USERS)) {
-      localStorage.setItem(KEYS.USERS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.TECHNICIANS)) {
-      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.LEADS)) {
-      localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.REVIEWS)) {
-      localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.AUDIT_LOGS)) {
-      localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.ACTIVITY_LOGS)) {
-      localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
-    }
-    if (!localStorage.getItem(KEYS.FAVORITES)) {
-      localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
+      if (!localStorage.getItem(KEYS.USERS)) {
+        localStorage.setItem(KEYS.USERS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.TECHNICIANS)) {
+        localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.LEADS)) {
+        localStorage.setItem(KEYS.LEADS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.REVIEWS)) {
+        localStorage.setItem(KEYS.REVIEWS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.AUDIT_LOGS)) {
+        localStorage.setItem(KEYS.AUDIT_LOGS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.ACTIVITY_LOGS)) {
+        localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify([]));
+      }
+      if (!localStorage.getItem(KEYS.FAVORITES)) {
+        localStorage.setItem(KEYS.FAVORITES, JSON.stringify([]));
+      }
+    } catch (err) {
+      console.warn('StorageService init note:', err);
     }
   }
 
@@ -148,13 +152,17 @@ class StorageService {
   }
 
   // --- CURRENT USER ---
-  clearSession() {
+  clearSession(silent = false) {
+    let hadSession = false;
     try {
+      hadSession = !!localStorage.getItem(KEYS.CURRENT_USER);
       localStorage.removeItem(KEYS.CURRENT_USER);
       localStorage.removeItem('needfix_auth_token');
       localStorage.removeItem('needfix_session');
     } catch {}
-    this.notify();
+    if (!silent && hadSession) {
+      this.notify();
+    }
   }
 
   getCurrentUser(): UserProfile | null {
@@ -163,9 +171,11 @@ class StorageService {
       if (!data) return null;
       const user: UserProfile = JSON.parse(data);
 
-      // Check if user is blocked or device is blocked
+      // Check if user is blocked or device is blocked (silent removal without recursive notify)
       if (user.isBlocked || (user as any).status === 'blocked') {
-        this.clearSession();
+        try {
+          localStorage.removeItem(KEYS.CURRENT_USER);
+        } catch {}
         return null;
       }
 
@@ -177,7 +187,9 @@ class StorageService {
       );
 
       if (isDeviceBlocked) {
-        this.clearSession();
+        try {
+          localStorage.removeItem(KEYS.CURRENT_USER);
+        } catch {}
         return null;
       }
 
@@ -191,14 +203,20 @@ class StorageService {
     if (user) {
       // Do not allow setting session if user or device is blocked
       if (user.isBlocked || (user as any).status === 'blocked') {
-        this.clearSession();
+        this.clearSession(true);
         return;
       }
-      localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
+      try {
+        localStorage.setItem(KEYS.CURRENT_USER, JSON.stringify(user));
+      } catch (e) {
+        console.warn('Storage quota warning in setCurrentUser:', e);
+      }
       // Also update in users list
       this.updateUser(user);
     } else {
-      localStorage.removeItem(KEYS.CURRENT_USER);
+      try {
+        localStorage.removeItem(KEYS.CURRENT_USER);
+      } catch {}
     }
     this.notify();
   }
@@ -990,7 +1008,7 @@ class StorageService {
     }
   }
 
-  addBlockedDevice(record: BlockedDeviceRecord): void {
+  addBlockedDevice(record: BlockedDeviceRecord, silent = false): void {
     try {
       const list = this.getBlockedDevices();
       const filtered = list.filter(
@@ -1001,7 +1019,9 @@ class StorageService {
       );
       filtered.unshift(record);
       localStorage.setItem(KEYS.BLOCKED_DEVICES, JSON.stringify(filtered));
-      this.notify();
+      if (!silent) {
+        this.notify();
+      }
     } catch (e) {
       console.warn('Error adding blocked device:', e);
     }

@@ -197,7 +197,7 @@ export default function App() {
   const syncState = () => {
     const user = storageService.getCurrentUser();
     if (user?.isBlocked || (user as any)?.status === 'blocked') {
-      storageService.clearSession();
+      storageService.clearSession(true);
       setCurrentUser(null);
       setSecurityStatus({
         isBlocked: true,
@@ -217,8 +217,6 @@ export default function App() {
     runDeviceSecurityVerification();
     const unsubStorage = storageService.subscribe(() => {
       syncState();
-      // Re-verify blocking status if local storage changes
-      deviceSecurityService.checkDeviceBlocked().then(setSecurityStatus).catch(() => {});
     });
 
     // Initialize root browser history state for seamless phone back navigation
@@ -322,8 +320,8 @@ export default function App() {
 
   // Toggle Favorite
   const handleToggleFavorite = (techId: string) => {
-    const updated = storageService.toggleFavorite(techId);
-    setFavorites(updated);
+    storageService.toggleFavorite(techId);
+    setFavorites(storageService.getFavorites());
   };
 
   // Auth completion handler
