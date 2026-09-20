@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { TechnicianProfile, Review, ActivityLog, TechnicianServiceItem } from '../../types';
 import { storageService } from '../../services/storage';
+import { supabaseService } from '../../services/supabaseService';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { getCurrentGPSLocation } from '../../services/locationService';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
@@ -74,19 +75,77 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isSyncingStatus, setIsSyncingStatus] = useState(false);
+  const [justApprovedAlert, setJustApprovedAlert] = useState(false);
+
+  const syncStatusWithDatabase = async (showLoading = false) => {
+    if (showLoading) setIsSyncingStatus(true);
+    try {
+      const targetId = tech.id || tech.userId || initialTech.id || initialTech.userId;
+      const remote = await supabaseService.getTechnicianProfile(targetId);
+      if (remote) {
+        setTech((prev) => {
+          const wasNotApproved = !prev.isApproved && prev.status !== 'approved';
+          const isNowApproved = remote.isApproved || remote.status === 'approved';
+          if (wasNotApproved && isNowApproved) {
+            setJustApprovedAlert(true);
+          }
+          return { ...prev, ...remote };
+        });
+      }
+    } catch (err) {
+      console.warn('Status sync error:', err);
+    } finally {
+      if (showLoading) setIsSyncingStatus(false);
+    }
+  };
 
   const loadData = () => {
-    const updated = storageService.getTechnicianById(initialTech.id);
-    if (updated) setTech(updated);
-    setReviews(storageService.getReviews(initialTech.id));
-    setActivityLogs(storageService.getActivityLogs(initialTech.id));
+    const targetId = tech.id || initialTech.id;
+    const updated =
+      storageService.getTechnicianById(targetId) ||
+      storageService.getTechnicians().find((t) => t.userId === initialTech.userId || t.id === initialTech.id);
+    if (updated) {
+      setTech((prev) => ({ ...prev, ...updated }));
+    }
+    setReviews(storageService.getReviews(targetId));
+    setActivityLogs(storageService.getActivityLogs(targetId));
   };
 
   useEffect(() => {
     loadData();
+    syncStatusWithDatabase(false);
+
     const unsubscribe = storageService.subscribe(loadData);
-    return unsubscribe;
-  }, [initialTech.id]);
+
+    // Subscribe to realtime changes in Supabase
+    const targetId = tech.id || tech.userId || initialTech.id || initialTech.userId;
+    const unsubRealtime = supabaseService.subscribeToTechnicianUpdates(targetId, (updated) => {
+      setTech((prev) => {
+        const wasNotApproved = !prev.isApproved && prev.status !== 'approved';
+        const isNowApproved = updated.isApproved || updated.status === 'approved';
+        if (wasNotApproved && isNowApproved) {
+          setJustApprovedAlert(true);
+        }
+        return { ...prev, ...updated };
+      });
+    });
+
+    // Background interval to re-check Supabase every 5 seconds if still pending
+    let interval: any = null;
+    const isLive = tech.status === 'approved' || tech.isApproved;
+    if (!isLive) {
+      interval = setInterval(() => {
+        syncStatusWithDatabase(false);
+      }, 5000);
+    }
+
+    return () => {
+      unsubscribe();
+      unsubRealtime();
+      if (interval) clearInterval(interval);
+    };
+  }, [initialTech.id, tech.id, tech.status, tech.isApproved]);
 
   const [isUpdatingGPS, setIsUpdatingGPS] = useState(false);
   const [gpsUpdateMsg, setGpsUpdateMsg] = useState<string | null>(null);
@@ -223,13 +282,37 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   };
 
   // Status-dependent variables
-  const isApproved = tech.status === 'approved';
-  const isPending = tech.status === 'pending';
+  const isApproved = tech.status === 'approved' || tech.isApproved === true;
+  const isPending = !isApproved && (tech.status === 'pending' || !tech.status);
   const isRejected = tech.status === 'rejected';
   const isSuspended = tech.status === 'suspended';
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      {/* Real-time approval celebration toast banner */}
+      {justApprovedAlert && (
+        <div className="p-4 sm:p-5 rounded-3xl bg-gradient-to-r from-emerald-950 via-emerald-900 to-slate-900 border border-emerald-500/80 text-white flex items-start gap-3.5 shadow-xl animate-in fade-in slide-in-from-top-3 duration-300">
+          <CheckCircle2 size={24} className="text-emerald-400 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <div className="flex items-center justify-between">
+              <h3 className="text-base font-bold text-emerald-200">
+                🎉 Congratulations! Your Technician Profile is Approved & Live!
+              </h3>
+              <button
+                type="button"
+                onClick={() => setJustApprovedAlert(false)}
+                className="text-emerald-300 hover:text-white text-xs px-2.5 py-1 rounded-xl bg-emerald-800/80 hover:bg-emerald-700 transition-colors"
+              >
+                Dismiss
+              </button>
+            </div>
+            <p className="text-xs sm:text-sm text-emerald-100/90 mt-1 leading-relaxed">
+              Your Aadhaar ID and business documents have been verified by the Admin team. Your profile is now actively visible to customers in your area and ready to receive bookings and direct calls.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* STATUS HEADER BANNER */}
       <div
         className={`rounded-3xl p-6 sm:p-7 border shadow-xl transition-all ${
@@ -267,6 +350,16 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
           {/* Status Controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            <button
+              type="button"
+              onClick={() => syncStatusWithDatabase(true)}
+              disabled={isSyncingStatus}
+              title="Sync profile status with live database"
+              className="p-2.5 rounded-2xl bg-white/10 hover:bg-white/20 text-white/90 transition-all border border-white/15 active:scale-95 flex items-center justify-center cursor-pointer"
+            >
+              <RefreshCw size={15} className={isSyncingStatus ? 'animate-spin' : ''} />
+            </button>
+
             {isApproved && (
               <button
                 onClick={handleToggleOnline}
@@ -312,14 +405,30 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
         {/* Status Explanation Card */}
         {isPending && (
-          <div className="mt-4 p-4 rounded-2xl bg-amber-900/40 border border-amber-600/60 text-xs text-amber-100 flex items-start gap-3">
-            <Clock size={20} className="text-amber-400 shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-bold text-amber-200 text-sm">Application Status: Pending Admin Review</p>
-              <p className="text-amber-100/90 mt-0.5 leading-relaxed">
-                Your technician registration documents (National ID Aadhaar card) are currently being reviewed by the NeedFix administration team.
-                Until approved, your profile will remain hidden from customer search results to prevent unverified listings.
-              </p>
+          <div className="mt-4 p-4 rounded-2xl bg-amber-900/40 border border-amber-600/60 text-xs text-amber-100">
+            <div className="flex items-start gap-3">
+              <Clock size={20} className="text-amber-400 shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold text-amber-200 text-sm">Application Status: Pending Admin Review</p>
+                <p className="text-amber-100/90 mt-0.5 leading-relaxed">
+                  Your technician registration documents (National ID Aadhaar card) are currently being reviewed by the NeedFix administration team.
+                  Until approved, your profile will remain hidden from customer search results to prevent unverified listings.
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => syncStatusWithDatabase(true)}
+                    disabled={isSyncingStatus}
+                    className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-500/30 hover:bg-amber-500/50 border border-amber-400/50 text-amber-100 font-semibold text-xs transition-all active:scale-95 cursor-pointer shadow-xs"
+                  >
+                    <RefreshCw size={13} className={isSyncingStatus ? 'animate-spin' : ''} />
+                    <span>{isSyncingStatus ? 'Checking Live Database...' : 'Check Approval Status Now'}</span>
+                  </button>
+                  <span className="text-[11px] text-amber-200/70">
+                    Auto-checking live updates every 5 seconds...
+                  </span>
+                </div>
+              </div>
             </div>
           </div>
         )}

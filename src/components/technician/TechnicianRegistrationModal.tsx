@@ -208,8 +208,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     setErrorMessage(null);
 
     try {
-      // Client-side compression to under 200KB
-      const compressed = await compressCardImage(file, 1200, 0.78);
+      // Client-side compression to under 250KB with high clarity
+      const compressed = await compressCardImage(file, { maxWidth: 1280, maxHeight: 960, quality: 0.82 });
       const compressedFile = new File([compressed.blob], file.name, { type: 'image/jpeg' });
       setAadhaarFile(compressedFile);
       setAadhaarDocUrl(compressed.dataUrl);
@@ -251,8 +251,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     setErrorMessage(null);
 
     try {
-      // Client-side compression to under 200KB
-      const compressed = await compressCardImage(file, 1200, 0.78);
+      // Client-side compression to under 250KB with high clarity
+      const compressed = await compressCardImage(file, { maxWidth: 1280, maxHeight: 960, quality: 0.82 });
       const compressedFile = new File([compressed.blob], file.name, { type: 'image/jpeg' });
       setAadhaarBackFile(compressedFile);
       setAadhaarBackDocUrl(compressed.dataUrl);

@@ -313,8 +313,20 @@ export default function App() {
 
   // Technician profile for the currently logged-in user (if any)
   const currentTechnicianProfile = currentUser
-    ? technicians.find((t) => t.userId === currentUser.id) ||
-      storageService.getTechnicians().find((t) => t.userId === currentUser.id) ||
+    ? technicians.find(
+        (t) =>
+          t.userId === currentUser.id ||
+          t.id === currentUser.id ||
+          (currentUser.technicianId && t.id === currentUser.technicianId)
+      ) ||
+      storageService
+        .getTechnicians()
+        .find(
+          (t) =>
+            t.userId === currentUser.id ||
+            t.id === currentUser.id ||
+            (currentUser.technicianId && t.id === currentUser.technicianId)
+        ) ||
       null
     : null;
 

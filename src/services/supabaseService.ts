@@ -651,11 +651,107 @@ export class SupabaseService {
   }
 
   /**
-   * 6. Fetch approved technicians from Central Server + Supabase + Local Cache
+   * Helper to map a Supabase technicians table row to a rich TechnicianProfile
+   */
+  mapSupabaseRowToProfile(d: any): TechnicianProfile {
+    const isApproved = d.is_approved === true || d.status === 'approved';
+    const isBlocked = d.is_blocked === true || d.status === 'blocked';
+    const techStatus = isBlocked ? 'blocked' : (d.status || (isApproved ? 'approved' : 'pending'));
+
+    return {
+      id: d.id,
+      technicianCode: d.technician_code || 'TECH-1',
+      userId: d.user_id || d.id,
+      fullName: d.full_name || 'Technician',
+      companyName: d.company_name || d.business_name || d.full_name || 'Service Partner',
+      mobile: d.mobile || '',
+      whatsappNumber: d.whatsapp_number || d.mobile || '',
+      categoryId: d.category_id || 'ac_service',
+      categoryName: d.category_name || 'AC Service & Repair',
+      categoryIds: Array.isArray(d.category_ids) ? d.category_ids : [d.category_id || 'ac_service'],
+      categoryNames: Array.isArray(d.category_names) ? d.category_names : [d.category_name || 'AC Service & Repair'],
+      experienceYears: d.experience_years || 5,
+      coverageRadiusKm: d.coverage_radius_km || 10,
+      coverageAreaText: d.coverage_area_text || d.city || 'Local Area',
+      businessAddress: d.business_address || d.address || 'Workshop',
+      businessDescription: d.business_description || 'NeedFix Verified Professional Technician',
+      location: {
+        latitude: d.latitude || 28.6139,
+        longitude: d.longitude || 77.2090,
+        city: d.city || 'Delhi',
+        area: d.area || 'Central',
+        address: d.address || 'Workshop',
+      },
+      profilePhotoUrl: d.profile_photo_url || d.profile_picture_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
+      companyLogoUrl: d.company_logo_url || '',
+      ipAddress: d.ip_address || '127.0.0.1',
+      deviceId: d.device_id || 'DEV-VERIFIED',
+      portfolioImages: Array.isArray(d.portfolio_images) ? d.portfolio_images : [],
+      documents: {
+        aadhaarNumber: d.aadhaar_number || 'Verified',
+        aadhaarDocUrl: d.aadhaar_url || d.aadhaar_card_url || '',
+        aadhaarBackDocUrl: d.aadhaar_back_url || undefined,
+        kyc_status: (techStatus === 'approved' ? 'verified' : 'pending_verification') as any,
+      },
+      startingPrice: d.starting_price || 299,
+      priceUnit: d.price_unit || 'Visiting Fee',
+      inspectionFee: d.inspection_fee || 299,
+      servicesOffered: Array.isArray(d.services_offered) ? d.services_offered : [],
+      workingHours: '08:30 AM - 08:30 PM',
+      availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+      isOnline: d.is_online ?? true,
+      isApproved: isApproved,
+      isBlocked: isBlocked,
+      isVerified: d.is_verified ?? isApproved,
+      status: techStatus as any,
+      rating: d.rating || 5.0,
+      ratingCount: d.rating_count || d.review_count || 0,
+      reviewCount: d.review_count || d.rating_count || 0,
+      appliedAt: d.created_at || d.applied_at || new Date().toISOString(),
+      createdAt: d.created_at || new Date().toISOString(),
+      reviewedAt: d.approved_at || undefined,
+      reviewedBy: d.approved_by || undefined,
+      rejectionReason: d.rejection_reason || undefined,
+      totalBookings: d.total_bookings || 0,
+      profileViews: d.profile_views || 0,
+      totalCalls: d.total_calls || 0,
+      totalWhatsAppClicks: d.total_whatsapp_clicks || 0,
+    };
+  }
+
+  /**
+   * 6. Fetch approved technicians from Supabase Database + Central Server + Local Cache
    */
   async getApprovedTechnicians(): Promise<TechnicianProfile[]> {
     let list = storageService.getApprovedTechnicians();
 
+    // 1. Fetch live approved technicians directly from Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: sbTechs, error } = await supabase
+          .from('technicians')
+          .select('*')
+          .or('is_approved.eq.true,status.eq.approved');
+
+        if (sbTechs && sbTechs.length > 0) {
+          const map = new Map<string, TechnicianProfile>();
+          list.forEach((t) => map.set(t.id, t));
+
+          sbTechs.forEach((row: any) => {
+            const mapped = this.mapSupabaseRowToProfile(row);
+            if (!mapped.isBlocked) {
+              map.set(mapped.id, mapped);
+              storageService.syncTechnicianFromRemote(mapped);
+            }
+          });
+          list = Array.from(map.values());
+        }
+      } catch (sbErr) {
+        console.warn('Supabase getApprovedTechnicians error:', sbErr);
+      }
+    }
+
+    // 2. Merge with Central Server API
     try {
       const res = await fetch('/api/technicians');
       if (res.ok) {
@@ -675,6 +771,103 @@ export class SupabaseService {
     }
 
     return list;
+  }
+
+  /**
+   * Fetch single technician's latest live profile from Supabase & Central API
+   * Essential for TechnicianDashboard to immediately reflect Admin approval!
+   */
+  async getTechnicianProfile(techIdOrUserId: string): Promise<TechnicianProfile | null> {
+    if (!techIdOrUserId) return null;
+
+    // 1. Query Supabase directly
+    if (isSupabaseConfigured()) {
+      try {
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(techIdOrUserId);
+        let query = supabase.from('technicians').select('*');
+        if (isUuid) {
+          query = query.or(`id.eq.${techIdOrUserId},user_id.eq.${techIdOrUserId},technician_code.eq.${techIdOrUserId}`);
+        } else {
+          query = query.or(`technician_code.eq.${techIdOrUserId},mobile.eq.${techIdOrUserId}`);
+        }
+
+        const { data, error } = await query.limit(1);
+
+        if (data && data.length > 0) {
+          const mapped = this.mapSupabaseRowToProfile(data[0]);
+          storageService.syncTechnicianFromRemote(mapped);
+          return mapped;
+        }
+      } catch (sbErr) {
+        console.warn('Supabase getTechnicianProfile notice:', sbErr);
+      }
+    }
+
+    // 2. Query Central Server API
+    try {
+      const res = await fetch(`/api/technicians/${techIdOrUserId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data && (data.id || data.userId)) {
+          storageService.syncTechnicianFromRemote(data);
+          return data;
+        }
+      }
+    } catch (apiErr) {
+      console.warn('API getTechnicianProfile notice:', apiErr);
+    }
+
+    // 3. Fallback to storageService
+    const local =
+      storageService.getTechnicianById(techIdOrUserId) ||
+      storageService.getTechnicians().find((t) => t.userId === techIdOrUserId || t.technicianCode === techIdOrUserId);
+    return local || null;
+  }
+
+  /**
+   * Realtime subscription for technician status updates from Supabase
+   */
+  subscribeToTechnicianUpdates(
+    techIdOrUserId: string,
+    onUpdate: (profile: TechnicianProfile) => void
+  ): () => void {
+    if (!isSupabaseConfigured() || !techIdOrUserId) {
+      return () => {};
+    }
+
+    try {
+      const channel = supabase
+        .channel(`tech-approval-${techIdOrUserId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'technicians',
+          },
+          (payload) => {
+            const newRow = payload.new;
+            if (
+              newRow &&
+              (newRow.id === techIdOrUserId ||
+                newRow.user_id === techIdOrUserId ||
+                newRow.technician_code === techIdOrUserId)
+            ) {
+              const profile = this.mapSupabaseRowToProfile(newRow);
+              storageService.syncTechnicianFromRemote(profile);
+              onUpdate(profile);
+            }
+          }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (err) {
+      console.warn('Realtime subscription warning:', err);
+      return () => {};
+    }
   }
 
   /**
@@ -791,67 +984,7 @@ export class SupabaseService {
           combined.forEach((t) => map.set(t.id, t));
 
           data.forEach((d: any) => {
-            const isApproved = d.is_approved === true || d.status === 'approved';
-            const isBlocked = d.is_blocked === true || d.status === 'blocked';
-            const techStatus = isBlocked ? 'blocked' : (d.status || (isApproved ? 'approved' : 'pending'));
-
-            const mapped: TechnicianProfile = {
-              id: d.id,
-              technicianCode: d.technician_code || 'TECH-1',
-              userId: d.user_id || d.id,
-              fullName: d.full_name || 'Technician',
-              companyName: d.company_name || d.business_name || d.full_name || 'Service Partner',
-              mobile: d.mobile || '',
-              whatsappNumber: d.whatsapp_number || d.mobile || '',
-              categoryId: d.category_id || 'ac_service',
-              categoryName: d.category_name || 'AC Service & Repair',
-              categoryIds: Array.isArray(d.category_ids) ? d.category_ids : [d.category_id || 'ac_service'],
-              categoryNames: Array.isArray(d.category_names) ? d.category_names : [d.category_name || 'AC Service & Repair'],
-              experienceYears: d.experience_years || 5,
-              coverageRadiusKm: d.coverage_radius_km || 10,
-              coverageAreaText: d.coverage_area_text || d.city || 'Local Area',
-              businessAddress: d.business_address || d.address || 'Workshop',
-              businessDescription: d.business_description || 'NeedFix Verified Professional Technician',
-              location: {
-                latitude: d.latitude || 28.6139,
-                longitude: d.longitude || 77.2090,
-                city: d.city || 'Delhi',
-                area: d.area || 'Central',
-                address: d.address || 'Workshop',
-              },
-              profilePhotoUrl: d.profile_photo_url || d.profile_picture_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
-              companyLogoUrl: d.company_logo_url || '',
-              ipAddress: d.ip_address || '127.0.0.1',
-              deviceId: d.device_id || 'DEV-VERIFIED',
-              portfolioImages: Array.isArray(d.portfolio_images) ? d.portfolio_images : [],
-              documents: {
-                aadhaarNumber: d.aadhaar_number || 'Verified',
-                aadhaarDocUrl: d.aadhaar_url || d.aadhaar_card_url || '',
-                aadhaarBackDocUrl: d.aadhaar_back_url || undefined,
-                kyc_status: (techStatus === 'approved' ? 'verified' : 'pending_verification') as any,
-              },
-              startingPrice: d.starting_price || 299,
-              priceUnit: d.price_unit || 'Visiting Fee',
-              inspectionFee: d.inspection_fee || 299,
-              servicesOffered: Array.isArray(d.services_offered) ? d.services_offered : [],
-              workingHours: '08:30 AM - 08:30 PM',
-              availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-              isOnline: d.is_online ?? true,
-              isApproved: isApproved,
-              isBlocked: isBlocked,
-              isVerified: d.is_verified ?? isApproved,
-              status: techStatus as any,
-              rating: d.rating || 5.0,
-              ratingCount: d.rating_count || d.review_count || 0,
-              reviewCount: d.review_count || d.rating_count || 0,
-              appliedAt: d.created_at || d.applied_at || new Date().toISOString(),
-              createdAt: d.created_at || new Date().toISOString(),
-              totalBookings: d.total_bookings || 0,
-              profileViews: d.profile_views || 0,
-              totalCalls: d.total_calls || 0,
-              totalWhatsAppClicks: d.total_whatsapp_clicks || 0,
-            };
-
+            const mapped = this.mapSupabaseRowToProfile(d);
             map.set(d.id, { ...(map.get(d.id) || {}), ...mapped });
           });
           combined = Array.from(map.values());

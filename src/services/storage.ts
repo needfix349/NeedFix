@@ -639,6 +639,51 @@ class StorageService {
     this.notify();
   }
 
+  // Synchronize technician profile from remote database (Supabase / Central API)
+  syncTechnicianFromRemote(tech: TechnicianProfile): void {
+    if (!tech || !tech.id) return;
+
+    try {
+      const primary: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.TECHNICIANS) || '[]');
+      const idx = primary.findIndex((t) => t.id === tech.id || t.userId === tech.userId);
+      if (idx >= 0) {
+        primary[idx] = { ...primary[idx], ...tech };
+      } else {
+        primary.unshift(tech);
+      }
+      localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(primary));
+
+      // Also update pending list
+      const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
+      const pIdx = pending.findIndex((p) => p.id === tech.id || p.userId === tech.userId);
+      if (pIdx >= 0) {
+        if (tech.status === 'approved' || tech.isApproved) {
+          pending[pIdx] = { ...pending[pIdx], ...tech, status: 'approved', isApproved: true };
+        } else {
+          pending[pIdx] = { ...pending[pIdx], ...tech };
+        }
+        localStorage.setItem(KEYS.PENDING_APPLICATIONS, JSON.stringify(pending));
+      }
+
+      // Update current logged-in user if this is their profile
+      const currentUser = this.getCurrentUser();
+      if (currentUser && (currentUser.id === tech.userId || currentUser.id === tech.id)) {
+        const isApproved = tech.status === 'approved' || tech.isApproved;
+        this.setCurrentUser({
+          ...currentUser,
+          role: isApproved ? 'technician' : currentUser.role,
+          status: tech.status || (isApproved ? 'approved' : currentUser.status),
+          isTechnicianRegistered: true,
+          technicianId: tech.id,
+        });
+      }
+
+      this.notify();
+    } catch (err) {
+      console.warn('syncTechnicianFromRemote warning:', err);
+    }
+  }
+
   // One-click Block / Blacklist or Unblock technician
   toggleTechnicianBlockStatus(
     technicianId: string,

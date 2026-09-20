@@ -48,20 +48,48 @@ export function loadImageElement(source: File | Blob | string): Promise<HTMLImag
  */
 export async function compressCardImage(
   source: File | Blob | string,
-  maxWidth = 1200,
-  maxHeight = 900,
-  initialQuality = 0.8
+  maxWidthOrOptions: number | { maxWidth?: number; maxHeight?: number; quality?: number } = 1200,
+  maxHeightParam: number = 900,
+  initialQualityParam: number = 0.8
 ): Promise<ProcessedImageResult> {
+  let maxWidth = 1200;
+  let maxHeight = 900;
+  let initialQuality = 0.8;
+
+  if (typeof maxWidthOrOptions === 'object' && maxWidthOrOptions !== null) {
+    if (maxWidthOrOptions.maxWidth) maxWidth = maxWidthOrOptions.maxWidth;
+    if (maxWidthOrOptions.maxHeight) maxHeight = maxWidthOrOptions.maxHeight;
+    if (maxWidthOrOptions.quality) initialQuality = maxWidthOrOptions.quality;
+  } else if (typeof maxWidthOrOptions === 'number') {
+    maxWidth = maxWidthOrOptions;
+    // Defend against caller passing quality (e.g. 0.78 or 0.8) as the 3rd parameter maxHeightParam
+    if (typeof maxHeightParam === 'number') {
+      if (maxHeightParam > 0 && maxHeightParam <= 1) {
+        initialQuality = maxHeightParam;
+        maxHeight = Math.round(maxWidth * 0.75); // sensible 4:3 card ratio
+      } else if (maxHeightParam > 1) {
+        maxHeight = maxHeightParam;
+      }
+    }
+    if (typeof initialQualityParam === 'number' && initialQualityParam > 0 && initialQualityParam <= 1) {
+      initialQuality = initialQualityParam;
+    }
+  }
+
   const img = await loadImageElement(source);
 
   let width = img.naturalWidth || img.width;
   let height = img.naturalHeight || img.height;
 
-  // Scale down if exceeds max dimensions while preserving aspect ratio
+  if (!width || !height || width < 10 || height < 10) {
+    throw new Error('Image dimensions are too small or invalid');
+  }
+
+  // Scale down ONLY if exceeds max dimensions while preserving aspect ratio
   if (width > maxWidth || height > maxHeight) {
     const ratio = Math.min(maxWidth / width, maxHeight / height);
-    width = Math.round(width * ratio);
-    height = Math.round(height * ratio);
+    width = Math.max(100, Math.round(width * ratio));
+    height = Math.max(100, Math.round(height * ratio));
   }
 
   const canvas = document.createElement('canvas');
@@ -76,6 +104,10 @@ export async function compressCardImage(
   // Draw background white
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, width, height);
+
+  // Enable high-quality image smoothing
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
 
   // Draw scaled image
   ctx.drawImage(img, 0, 0, width, height);

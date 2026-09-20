@@ -66,6 +66,17 @@ async function startServer() {
     res.json(techs);
   });
 
+  // GET /api/technicians/:id
+  app.get('/api/technicians/:id', (req, res) => {
+    const techId = req.params.id;
+    const techs = readJsonFile<any[]>(TECHS_FILE, []);
+    const found = techs.find((t) => t.id === techId || t.userId === techId || t.technicianCode === techId);
+    if (!found) {
+      return res.status(404).json({ error: 'Technician not found' });
+    }
+    res.json(found);
+  });
+
   // POST /api/technicians (Create or submit registration)
   app.post('/api/technicians', (req, res) => {
     const newTech = req.body;
