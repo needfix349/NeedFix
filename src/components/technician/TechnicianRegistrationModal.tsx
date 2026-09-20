@@ -615,6 +615,15 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         };
         storageService.setCurrentUser(updatedUser);
 
+        // Sync to Central API
+        try {
+          fetch('/api/technicians', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(fallbackProfile),
+          }).catch(() => {});
+        } catch {}
+
         setIsSubmissionSuccess(true);
         setTimeout(() => {
           setIsSubmitting(false);

@@ -476,70 +476,111 @@ export class SupabaseService {
       | 'appliedAt'
     >
   ): Promise<TechnicianProfile> {
-    // First save in local storage service for instant reactive UI updates
+    // 1. First save in local storage service for instant reactive UI updates
     const newProfile = storageService.submitTechnicianApplication(technicianData);
 
-    // Sync to Central Persistent Server API
+    // 2. Sync to Central Persistent Server API (/api/technicians) with safe timeout
     try {
-      fetch('/api/technicians', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProfile),
-      }).catch((e) => console.warn('API /api/technicians post error:', e));
-    } catch {}
+      await Promise.race([
+        fetch('/api/technicians', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newProfile),
+        }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('API timeout')), 2500)),
+      ]);
+    } catch (e) {
+      console.warn('API /api/technicians post notice:', e);
+    }
 
-    // Sync to Supabase PostgreSQL database (users table)
+    // 3. Sync to Supabase PostgreSQL database
     if (isSupabaseConfigured()) {
-      try {
-        await supabase.from('users').upsert({
-          id: newProfile.userId,
-          name: newProfile.fullName,
-          username: (`tech_${newProfile.technicianCode || newProfile.id}`).toLowerCase().replace(/[^a-z0-9_]/g, '_'),
-          password_hash: 'technician_account',
-          security_pin: '0000',
-          role: 'technician',
-          status: 'pending',
-          radius_km: newProfile.coverageRadiusKm || 10,
-          installation_id: newProfile.deviceId || undefined,
-          created_at: newProfile.appliedAt,
-        }, { onConflict: 'id' });
-      } catch (err) {
-        console.warn('Supabase users table technician registration exception:', err);
+      // Upsert into users table ONLY if userId is a valid UUID (to prevent Postgres 22P02 error)
+      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(newProfile.userId);
+      if (isUuid) {
+        try {
+          await supabase.from('users').upsert({
+            id: newProfile.userId,
+            name: newProfile.fullName,
+            username: (`tech_${newProfile.technicianCode || newProfile.id}`).toLowerCase().replace(/[^a-z0-9_]/g, '_'),
+            password_hash: 'technician_account',
+            security_pin: '0000',
+            role: 'technician',
+            status: 'pending',
+            radius_km: newProfile.coverageRadiusKm || 10,
+            installation_id: newProfile.deviceId || undefined,
+            created_at: newProfile.appliedAt,
+          }, { onConflict: 'id' });
+        } catch (err) {
+          console.warn('Supabase users table technician registration notice:', err);
+        }
       }
 
-      try {
-        const { error } = await supabase.from('technicians').insert({
-          id: newProfile.id,
-          user_id: newProfile.userId,
-          full_name: newProfile.fullName,
-          company_name: newProfile.companyName,
-          mobile: newProfile.mobile,
-          whatsapp_number: newProfile.whatsappNumber,
-          category_id: newProfile.categoryId,
-          category_name: newProfile.categoryName,
-          category_ids: newProfile.categoryIds || [newProfile.categoryId],
-          experience_years: newProfile.experienceYears,
-          coverage_radius_km: newProfile.coverageRadiusKm,
-          inspection_fee: newProfile.inspectionFee,
-          starting_price: newProfile.startingPrice,
-          technician_code: newProfile.technicianCode,
-          is_blocked: false,
-          aadhaar_number: newProfile.documents?.aadhaarNumber || null,
-          aadhaar_url: newProfile.documents?.aadhaarDocUrl || '',
-          ip_address: newProfile.ipAddress || null,
-          device_id: newProfile.deviceId || null,
-          is_approved: false, // strictly false until admin approval
-          is_verified: false,
-          is_online: false,
-          rating: newProfile.rating,
-          rating_count: newProfile.reviewCount,
-          city: newProfile.location.city,
-          address: newProfile.location.address,
-          created_at: newProfile.appliedAt,
-        });
+      // Upsert into technicians table with comprehensive dual-column compatibility
+      const fullTechPayload: Record<string, any> = {
+        id: newProfile.id,
+        user_id: newProfile.userId,
+        full_name: newProfile.fullName,
+        company_name: newProfile.companyName || newProfile.fullName,
+        business_name: newProfile.companyName || newProfile.fullName,
+        mobile: newProfile.mobile,
+        whatsapp_number: newProfile.whatsappNumber || newProfile.mobile,
+        category_id: newProfile.categoryId,
+        category_name: newProfile.categoryName,
+        category_ids: newProfile.categoryIds || [newProfile.categoryId],
+        services_offered: newProfile.servicesOffered || [],
+        experience_years: newProfile.experienceYears || 5,
+        coverage_radius_km: newProfile.coverageRadiusKm || 10,
+        coverage_area_text: newProfile.coverageAreaText || newProfile.location?.area || 'Local Area',
+        inspection_fee: newProfile.inspectionFee || 299,
+        starting_price: newProfile.startingPrice || 299,
+        technician_code: newProfile.technicianCode,
+        is_blocked: false,
+        aadhaar_number: newProfile.documents?.aadhaarNumber || null,
+        aadhaar_url: newProfile.documents?.aadhaarDocUrl || '',
+        aadhaar_card_url: newProfile.documents?.aadhaarDocUrl || '',
+        profile_photo_url: newProfile.profilePhotoUrl || '',
+        company_logo_url: newProfile.companyLogoUrl || '',
+        business_description: newProfile.businessDescription || '',
+        ip_address: newProfile.ipAddress || null,
+        device_id: newProfile.deviceId || null,
+        status: 'pending',
+        is_approved: false,
+        is_verified: false,
+        is_online: false,
+        rating: newProfile.rating || 5.0,
+        rating_count: 0,
+        review_count: 0,
+        city: newProfile.location?.city || 'Delhi',
+        address: newProfile.location?.address || 'Workshop',
+        created_at: newProfile.appliedAt,
+      };
 
+      try {
+        const { error } = await supabase.from('technicians').upsert(fullTechPayload, { onConflict: 'id' });
         if (error) {
-          console.warn('Supabase technicians insert notice:', error.message);
+          console.warn('Supabase technicians initial upsert notice (trying fallback):', error.message);
+          // If custom column missing before SQL migration runs, use universal standard columns
+          const safeFallback = {
+            id: newProfile.id,
+            user_id: newProfile.userId,
+            full_name: newProfile.fullName,
+            business_name: newProfile.companyName || newProfile.fullName,
+            mobile: newProfile.mobile,
+            category_id: newProfile.categoryId,
+            category_name: newProfile.categoryName,
+            starting_price: newProfile.startingPrice || 299,
+            technician_code: newProfile.technicianCode,
+            status: 'pending',
+            is_blocked: false,
+            is_verified: false,
+            is_online: false,
+            rating: 5.0,
+            city: newProfile.location?.city || 'Delhi',
+            address: newProfile.location?.address || 'Workshop',
+            created_at: newProfile.appliedAt,
+          };
+          await supabase.from('technicians').upsert(safeFallback, { onConflict: 'id' });
         }
       } catch (err) {
         console.warn('Supabase DB error while inserting technician:', err);
@@ -745,64 +786,73 @@ export class SupabaseService {
           .select('*')
           .order('created_at', { ascending: false });
 
-        if (!error && data) {
+        if (!error && data && Array.isArray(data)) {
           const map = new Map<string, TechnicianProfile>();
           combined.forEach((t) => map.set(t.id, t));
+
           data.forEach((d: any) => {
-            if (!map.has(d.id)) {
-              map.set(d.id, {
-                id: d.id,
-                technicianCode: d.technician_code || 'TECH-1',
-                userId: d.user_id,
-                fullName: d.full_name,
-                companyName: d.company_name,
-                mobile: d.mobile,
-                whatsappNumber: d.whatsapp_number,
-                categoryId: d.category_id,
-                categoryName: d.category_name,
-                experienceYears: d.experience_years || 5,
-                coverageRadiusKm: d.coverage_radius_km || 10,
-                coverageAreaText: d.city,
-                businessAddress: d.address,
-                businessDescription: d.business_description || 'NeedFix Verified Professional Technician',
-                location: {
-                  latitude: 28.6139,
-                  longitude: 77.2090,
-                  city: d.city || 'Delhi',
-                  area: 'Central',
-                  address: d.address || 'Workshop',
-                },
-                profilePhotoUrl: d.profile_photo_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
-                companyLogoUrl: d.company_logo_url || '',
-                ipAddress: d.ip_address || '127.0.0.1',
-                deviceId: d.device_id || 'DEV-VERIFIED',
-                portfolioImages: [],
-                documents: {
-                  aadhaarNumber: d.aadhaar_number || 'Verified',
-                  aadhaarDocUrl: d.aadhaar_url,
-                },
-                startingPrice: d.starting_price || 299,
-                priceUnit: 'Visiting Fee',
-                inspectionFee: d.inspection_fee || 299,
-                servicesOffered: [],
-                workingHours: '08:30 AM - 08:30 PM',
-                availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
-                isOnline: d.is_online ?? true,
-                isApproved: d.is_approved ?? false,
-                isBlocked: d.is_blocked ?? false,
-                isVerified: d.is_verified ?? false,
-                status: (d.status || (d.is_approved ? 'approved' : 'pending')) as any,
-                rating: d.rating || 5.0,
-                ratingCount: d.rating_count || 0,
-                reviewCount: d.rating_count || 0,
-                appliedAt: d.created_at || d.applied_at || new Date().toISOString(),
-                createdAt: d.created_at || new Date().toISOString(),
-                totalBookings: d.total_bookings || 0,
-                profileViews: d.profile_views || 0,
-                totalCalls: d.total_calls || 0,
-                totalWhatsAppClicks: d.total_whatsapp_clicks || 0,
-              });
-            }
+            const isApproved = d.is_approved === true || d.status === 'approved';
+            const isBlocked = d.is_blocked === true || d.status === 'blocked';
+            const techStatus = isBlocked ? 'blocked' : (d.status || (isApproved ? 'approved' : 'pending'));
+
+            const mapped: TechnicianProfile = {
+              id: d.id,
+              technicianCode: d.technician_code || 'TECH-1',
+              userId: d.user_id || d.id,
+              fullName: d.full_name || 'Technician',
+              companyName: d.company_name || d.business_name || d.full_name || 'Service Partner',
+              mobile: d.mobile || '',
+              whatsappNumber: d.whatsapp_number || d.mobile || '',
+              categoryId: d.category_id || 'ac_service',
+              categoryName: d.category_name || 'AC Service & Repair',
+              categoryIds: Array.isArray(d.category_ids) ? d.category_ids : [d.category_id || 'ac_service'],
+              categoryNames: Array.isArray(d.category_names) ? d.category_names : [d.category_name || 'AC Service & Repair'],
+              experienceYears: d.experience_years || 5,
+              coverageRadiusKm: d.coverage_radius_km || 10,
+              coverageAreaText: d.coverage_area_text || d.city || 'Local Area',
+              businessAddress: d.business_address || d.address || 'Workshop',
+              businessDescription: d.business_description || 'NeedFix Verified Professional Technician',
+              location: {
+                latitude: d.latitude || 28.6139,
+                longitude: d.longitude || 77.2090,
+                city: d.city || 'Delhi',
+                area: d.area || 'Central',
+                address: d.address || 'Workshop',
+              },
+              profilePhotoUrl: d.profile_photo_url || d.profile_picture_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
+              companyLogoUrl: d.company_logo_url || '',
+              ipAddress: d.ip_address || '127.0.0.1',
+              deviceId: d.device_id || 'DEV-VERIFIED',
+              portfolioImages: Array.isArray(d.portfolio_images) ? d.portfolio_images : [],
+              documents: {
+                aadhaarNumber: d.aadhaar_number || 'Verified',
+                aadhaarDocUrl: d.aadhaar_url || d.aadhaar_card_url || '',
+                aadhaarBackDocUrl: d.aadhaar_back_url || undefined,
+                kyc_status: (techStatus === 'approved' ? 'verified' : 'pending_verification') as any,
+              },
+              startingPrice: d.starting_price || 299,
+              priceUnit: d.price_unit || 'Visiting Fee',
+              inspectionFee: d.inspection_fee || 299,
+              servicesOffered: Array.isArray(d.services_offered) ? d.services_offered : [],
+              workingHours: '08:30 AM - 08:30 PM',
+              availableDays: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+              isOnline: d.is_online ?? true,
+              isApproved: isApproved,
+              isBlocked: isBlocked,
+              isVerified: d.is_verified ?? isApproved,
+              status: techStatus as any,
+              rating: d.rating || 5.0,
+              ratingCount: d.rating_count || d.review_count || 0,
+              reviewCount: d.review_count || d.rating_count || 0,
+              appliedAt: d.created_at || d.applied_at || new Date().toISOString(),
+              createdAt: d.created_at || new Date().toISOString(),
+              totalBookings: d.total_bookings || 0,
+              profileViews: d.profile_views || 0,
+              totalCalls: d.total_calls || 0,
+              totalWhatsAppClicks: d.total_whatsapp_clicks || 0,
+            };
+
+            map.set(d.id, { ...(map.get(d.id) || {}), ...mapped });
           });
           combined = Array.from(map.values());
         }
