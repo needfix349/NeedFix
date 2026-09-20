@@ -21,6 +21,7 @@ import {
 import { supabaseService } from '../../services/supabaseService';
 import { storageService } from '../../services/storage';
 import { UserProfile } from '../../types';
+import { mergeAadhaarFrontAndBack } from '../../utils/aadhaarImageProcessor';
 
 interface GuidedAadhaarKYCModalProps {
   isOpen: boolean;
@@ -33,6 +34,8 @@ interface GuidedAadhaarKYCModalProps {
     dob: string;
     frontUrl: string;
     backUrl: string;
+    mergedUrl?: string;
+    mergedBlob?: Blob;
   }) => void;
 }
 
@@ -415,14 +418,44 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      // 1. Upload Front Side to Supabase Storage bucket `kyc-documents/aadhaar/`
-      const frontUrl = await supabaseService.uploadKYCDocument(
+      // 0. Merge Front and Back into 1 Single Compressed Document (2 photo 1 photo ban ke save ho compress hoke)
+      let mergedDataUrl = '';
+      let mergedBlob: Blob | undefined;
+      try {
+        const merged = await mergeAadhaarFrontAndBack(
+          frontSide.blob,
+          backSide.blob,
+          aadhaarNumber
+        );
+        mergedDataUrl = merged.dataUrl;
+        mergedBlob = merged.blob;
+      } catch (mergeErr) {
+        console.warn('KYC dual-side auto merge notice:', mergeErr);
+      }
+
+      // 1. Upload Merged & Front/Back to Supabase Storage bucket `kyc-documents/aadhaar/`
+      let mergedStorageUrl = '';
+      if (mergedBlob) {
+        try {
+          mergedStorageUrl = await supabaseService.uploadKYCDocument(
+            mergedBlob,
+            currentUser.id,
+            'aadhaar',
+            'front',
+            'aadhaar_2in1_merged.jpg'
+          );
+        } catch (mUploadErr) {
+          console.warn('Merged upload warning:', mUploadErr);
+        }
+      }
+
+      const frontUrl = mergedStorageUrl || (await supabaseService.uploadKYCDocument(
         frontSide.blob,
         currentUser.id,
         'aadhaar',
         'front',
         'aadhaar_front.jpg'
-      );
+      ));
 
       // 2. Upload Back Side to Supabase Storage bucket `kyc-documents/aadhaar/`
       const backUrl = await supabaseService.uploadKYCDocument(
@@ -437,7 +470,7 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
       await supabaseService.updateUserKYCStatus(currentUser.id, {
         kyc_status: 'pending_verification',
         aadhaar_number: aadhaarNumber,
-        aadhaar_front_url: frontUrl,
+        aadhaar_front_url: mergedStorageUrl || frontUrl,
         aadhaar_back_url: backUrl,
         full_name_aadhaar: fullName.trim(),
         dob: dob,
@@ -447,7 +480,7 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
       storageService.updateUserKYC(currentUser.id, {
         kyc_status: 'pending_verification',
         aadhaar_number: aadhaarNumber,
-        aadhaar_front_url: frontUrl,
+        aadhaar_front_url: mergedStorageUrl || frontUrl,
         aadhaar_back_url: backUrl,
         full_name_aadhaar: fullName.trim(),
         dob: dob,
@@ -460,16 +493,18 @@ export const GuidedAadhaarKYCModal: React.FC<GuidedAadhaarKYCModalProps> = ({
           aadhaarNumber,
           fullName: fullName.trim(),
           dob,
-          frontUrl,
+          frontUrl: mergedDataUrl || frontUrl,
           backUrl,
+          mergedUrl: mergedDataUrl || mergedStorageUrl || frontUrl,
+          mergedBlob,
         });
       }
 
-      // Auto close after 3 seconds or user can tap close
+      // Auto close after 2.5 seconds or user can tap close
       setTimeout(() => {
         setIsSubmittedSuccess(false);
         onClose();
-      }, 3500);
+      }, 2500);
     } catch (err: any) {
       console.warn('KYC Submission error:', err);
       setSubmitError(err?.message || 'KYC submission failed. Please try again.');

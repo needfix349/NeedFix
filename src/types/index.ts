@@ -97,7 +97,9 @@ export interface TechnicianDocument {
 export interface TechnicianServiceItem {
   id?: string;
   name: string;
-  price: number;
+  price?: number;
+  categoryId?: string;
+  categoryName?: string;
   description?: string;
   photoUrl?: string; // Photo of work / service item
   duration?: string;
