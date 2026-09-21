@@ -26,6 +26,7 @@ import { VerifiedBadge } from '../common/VerifiedBadge';
 import { NeedFixAppIcon } from '../common/NeedFixAppIcon';
 import { calculateDistanceKm, MAJOR_CITIES, getCurrentGPSLocation } from '../../services/locationService';
 import { storageService } from '../../services/storage';
+import { deviceSecurityService } from '../../services/deviceSecurityService';
 
 interface MobileAppViewProps {
   technicians: TechnicianProfile[];
@@ -379,8 +380,12 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                                   onOpenAuth();
                                   return;
                                 }
+                                const custId = deviceSecurityService.getCustomerId();
                                 storageService.logActivity({
                                   technicianId: tech.id,
+                                  customerId: custId,
+                                  customerName: currentUser.name || 'Customer',
+                                  customerPhone: currentUser.mobile,
                                   type: 'call',
                                   metadata: { phone: tech.mobile },
                                 });
@@ -400,8 +405,12 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                                   onOpenAuth();
                                   return;
                                 }
+                                const custId = deviceSecurityService.getCustomerId();
                                 storageService.logActivity({
                                   technicianId: tech.id,
+                                  customerId: custId,
+                                  customerName: currentUser.name || 'Customer',
+                                  customerPhone: currentUser.mobile,
                                   type: 'whatsapp',
                                   metadata: { whatsapp: tech.whatsappNumber },
                                 });

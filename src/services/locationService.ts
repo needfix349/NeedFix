@@ -423,9 +423,10 @@ export function calculateDistanceKm(
  */
 export function get_nearby_technicians<
   T extends {
-    location: { latitude: number; longitude: number };
+    location?: { latitude?: number | string; longitude?: number | string };
     status?: string;
     isBlocked?: boolean;
+    isApproved?: boolean;
   }
 >(
   technicians: T[],
@@ -439,30 +440,32 @@ export function get_nearby_technicians<
   return technicians
     .filter((tech) => {
       // Must be approved and unblocked
-      if (tech.status && tech.status !== 'approved') return false;
+      const isApproved = tech.isApproved === true || tech.status === 'approved';
+      if (!isApproved) return false;
       if (tech.isBlocked) return false;
-      if (
-        !tech.location ||
-        typeof tech.location.latitude !== 'number' ||
-        typeof tech.location.longitude !== 'number'
-      ) {
+
+      const techLat = Number(tech.location?.latitude);
+      const techLng = Number(tech.location?.longitude);
+      if (isNaN(techLat) || isNaN(techLng)) {
         return false;
       }
       const dist = calculateDistanceKm(
         userLatitude,
         userLongitude,
-        tech.location.latitude,
-        tech.location.longitude
+        techLat,
+        techLng
       );
       // Strictly within the selected radius
       return dist <= safeRadius;
     })
     .map((tech) => {
+      const techLat = Number(tech.location?.latitude) || userLatitude;
+      const techLng = Number(tech.location?.longitude) || userLongitude;
       const dist = calculateDistanceKm(
         userLatitude,
         userLongitude,
-        tech.location.latitude,
-        tech.location.longitude
+        techLat,
+        techLng
       );
       return {
         ...tech,

@@ -26,6 +26,8 @@ import {
   Tag,
   Navigation,
   Building2,
+  Mail,
+  Flag,
 } from 'lucide-react';
 import { TechnicianProfile, Review, ActivityLog, TechnicianServiceItem } from '../../types';
 import { storageService } from '../../services/storage';
@@ -110,6 +112,12 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     }
     setReviews(storageService.getReviews(targetId));
     setActivityLogs(storageService.getActivityLogs(targetId));
+    // Also sync latest logs from backend API if available
+    storageService.fetchRemoteActivityLogs(targetId).then((remote) => {
+      if (remote && Array.isArray(remote)) {
+        setActivityLogs(remote);
+      }
+    });
   };
 
   useEffect(() => {
@@ -150,6 +158,8 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   const [isUpdatingGPS, setIsUpdatingGPS] = useState(false);
   const [gpsUpdateMsg, setGpsUpdateMsg] = useState<string | null>(null);
   const [showWorkshopLocationModal, setShowWorkshopLocationModal] = useState(false);
+  const [isTogglingOnline, setIsTogglingOnline] = useState(false);
+  const [onlineStatusMsg, setOnlineStatusMsg] = useState<string | null>(null);
 
   const handleUpdateWorkshopGPS = async () => {
     setIsUpdatingGPS(true);
@@ -162,34 +172,54 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
         coverageAreaText: `${loc.area}, ${loc.city}`,
         businessAddress: loc.address || `${loc.area}, ${loc.city}`,
       };
-      storageService.updateTechnicianProfile(updated);
       setTech(updated);
+      storageService.updateTechnicianProfile(updated);
+      await supabaseService.updateTechnicianProfile(updated);
       setGpsUpdateMsg(`Workshop GPS Pin updated to ${loc.area || loc.city}`);
       setTimeout(() => setGpsUpdateMsg(null), 4000);
     } catch (e) {
       console.error(e);
+      setGpsUpdateMsg('Could not detect live GPS. Please verify permissions.');
+      setTimeout(() => setGpsUpdateMsg(null), 4000);
     } finally {
       setIsUpdatingGPS(false);
     }
   };
 
-  const handleManualSelectWorkshopLocation = (loc: any) => {
+  const handleManualSelectWorkshopLocation = async (loc: any) => {
     const updated: TechnicianProfile = {
       ...tech,
       location: loc,
       coverageAreaText: `${loc.area}, ${loc.city}`,
       businessAddress: loc.address || `${loc.area}, ${loc.city}`,
     };
-    storageService.updateTechnicianProfile(updated);
     setTech(updated);
+    storageService.updateTechnicianProfile(updated);
+    await supabaseService.updateTechnicianProfile(updated);
     setGpsUpdateMsg(`Workshop Location updated to ${loc.area || loc.city}`);
     setTimeout(() => setGpsUpdateMsg(null), 4000);
   };
 
-  const handleToggleOnline = () => {
-    const updated = { ...tech, isOnline: !tech.isOnline };
-    storageService.updateTechnicianProfile(updated);
+  const handleToggleOnline = async () => {
+    if (isTogglingOnline) return;
+    const newOnline = !tech.isOnline;
+    setIsTogglingOnline(true);
+    const updated = { ...tech, isOnline: newOnline };
     setTech(updated);
+    storageService.updateTechnicianProfile(updated);
+    try {
+      await supabaseService.updateTechnicianOnlineStatus(tech.id, newOnline);
+      setOnlineStatusMsg(
+        newOnline
+          ? '🟢 You are now ONLINE & accepting customer leads!'
+          : '⚪ You are now OFFLINE (Paused)'
+      );
+      setTimeout(() => setOnlineStatusMsg(null), 4000);
+    } catch (err) {
+      console.warn('Error syncing online status:', err);
+    } finally {
+      setIsTogglingOnline(false);
+    }
   };
 
   const handleSendReply = (reviewId: string) => {
@@ -258,7 +288,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
     setEditServices(editServices.filter((_, i) => i !== index));
   };
 
-  const handleSaveProfileSettings = (e: React.FormEvent) => {
+  const handleSaveProfileSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSavingProfile(true);
     const updated: TechnicianProfile = {
@@ -274,8 +304,9 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       workingHours: editWorkingHours.trim(),
       servicesOffered: editServices,
     };
-    storageService.updateTechnicianProfile(updated);
     setTech(updated);
+    storageService.updateTechnicianProfile(updated);
+    await supabaseService.updateTechnicianProfile(updated);
     setIsSavingProfile(false);
     setSaveSuccess(true);
     setTimeout(() => setSaveSuccess(false), 3000);
@@ -362,15 +393,24 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
             {isApproved && (
               <button
+                type="button"
                 onClick={handleToggleOnline}
-                className={`py-2 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md ${
+                disabled={isTogglingOnline}
+                title="Toggle Live Online status to receive bookings from customers"
+                className={`py-2 px-4 rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer ${
                   tech.isOnline
                     ? 'bg-emerald-500 hover:bg-emerald-600 text-white shadow-emerald-500/30'
                     : 'bg-slate-700 hover:bg-slate-600 text-slate-300'
-                }`}
+                } ${isTogglingOnline ? 'opacity-70 cursor-wait' : ''}`}
               >
-                <Power size={14} />
-                <span>{tech.isOnline ? '🟢 Accepting Leads (Online)' : '⚪ Paused (Offline)'}</span>
+                <Power size={14} className={tech.isOnline ? 'animate-pulse' : ''} />
+                <span>
+                  {isTogglingOnline
+                    ? 'Updating...'
+                    : tech.isOnline
+                    ? '🟢 Accepting Leads (Online)'
+                    : '⚪ Paused (Offline)'}
+                </span>
               </button>
             )}
 
@@ -402,6 +442,14 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Live Online Toggle Feedback Toast */}
+        {onlineStatusMsg && (
+          <div className="mt-4 p-3 rounded-2xl bg-white/10 backdrop-blur-md border border-white/20 text-white text-xs font-semibold flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+            <span>{onlineStatusMsg}</span>
+          </div>
+        )}
 
         {/* Status Explanation Card */}
         {isPending && (
@@ -510,7 +558,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
             }`}
           >
             <Phone size={14} />
-            <span>Calls & WhatsApp Logs ({activityLogs.length})</span>
+            <span>Customer Calls & WhatsApp ({activityLogs.length})</span>
           </button>
 
           <button
@@ -542,9 +590,16 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
           {/* TAB 1: CALL & WHATSAPP LOGS */}
           {activeTab === 'activity' && (
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900">Direct Calls & WhatsApp Inquiry Logs</h3>
-                <span className="text-xs text-slate-500">Real-time customer engagement tracker</span>
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">Customer Inquiries (Call & WhatsApp Logs)</h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    View customer name & ID. Tap <strong>Complaint</strong> to send an official report directly to Admin via email.
+                  </p>
+                </div>
+                <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-xl border border-blue-200">
+                  {activityLogs.length} Customer {activityLogs.length === 1 ? 'Action' : 'Actions'}
+                </span>
               </div>
 
               {activityLogs.length === 0 ? (
@@ -556,42 +611,90 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden">
-                  {activityLogs.map((log) => (
-                    <div
-                      key={log.id}
-                      className="p-3.5 bg-white hover:bg-slate-50 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-bold ${
-                            log.type === 'call'
-                              ? 'bg-blue-100 text-blue-700'
-                              : log.type === 'whatsapp'
-                              ? 'bg-emerald-100 text-emerald-700'
-                              : 'bg-purple-100 text-purple-700'
-                          }`}
-                        >
-                          {log.type === 'call' ? <Phone size={14} /> : log.type === 'whatsapp' ? <MessageSquare size={14} /> : <Eye size={14} />}
-                        </span>
-                        <div>
-                          <p className="font-bold text-slate-900">
-                            {log.type === 'call'
-                              ? 'Direct Phone Call Tap'
-                              : log.type === 'whatsapp'
-                              ? 'WhatsApp Chat Launch'
-                              : 'Profile Viewed'}
-                          </p>
-                          <p className="text-[11px] text-slate-500">
-                            Customer: {log.customerName || 'Anonymous Customer'} {log.customerPhone ? `(${log.customerPhone})` : ''}
-                          </p>
+                <div className="divide-y divide-slate-100 border border-slate-200 rounded-2xl overflow-hidden shadow-xs">
+                  {activityLogs.map((log) => {
+                    const custId = log.customerId || 'CUST-Pending';
+                    const custName = log.customerName || 'Customer';
+                    const techCode = tech.technicianCode || `TECH-${tech.id.slice(-4)}`;
+                    
+                    const complaintSubject = encodeURIComponent(
+                      `[NeedFix Complaint] Report against Customer ID: ${custId}`
+                    );
+                    const complaintBody = encodeURIComponent(
+                      `Dear NeedFix Admin,\n\nI am reporting an issue/complaint regarding the following customer:\n\n- Customer ID: ${custId}\n- Customer Name: ${custName}\n- Contact Type: ${log.type === 'call' ? 'Phone Call' : log.type === 'whatsapp' ? 'WhatsApp' : 'Profile Interaction'}\n- Time of Interaction: ${new Date(log.timestamp).toLocaleString()}\n\nTechnician Details:\n- Technician Name: ${tech.fullName}\n- Technician ID: ${techCode}\n- Phone: ${tech.mobile}\n\nComplaint / Issue Details:\n[Please describe what happened here...]\n\nRegards,\n${tech.fullName}`
+                    );
+                    const mailtoUrl = `mailto:needfix349@gmail.com?subject=${complaintSubject}&body=${complaintBody}`;
+
+                    return (
+                      <div
+                        key={log.id}
+                        className="p-3.5 sm:p-4 bg-white hover:bg-slate-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs transition-colors"
+                      >
+                        <div className="flex items-start sm:items-center gap-3 min-w-0">
+                          <span
+                            className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
+                              log.type === 'call'
+                                ? 'bg-blue-100 text-blue-700'
+                                : log.type === 'whatsapp'
+                                ? 'bg-emerald-100 text-emerald-700'
+                                : 'bg-purple-100 text-purple-700'
+                            }`}
+                          >
+                            {log.type === 'call' ? (
+                              <Phone size={16} />
+                            ) : log.type === 'whatsapp' ? (
+                              <MessageSquare size={16} />
+                            ) : (
+                              <Eye size={16} />
+                            )}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-slate-900 text-sm">
+                                {custName}
+                              </p>
+                              <span className="font-mono text-[11px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200">
+                                ID: {custId}
+                              </span>
+                              <span
+                                className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                  log.type === 'call'
+                                    ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                                    : log.type === 'whatsapp'
+                                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                    : 'bg-purple-50 text-purple-700 border border-purple-200'
+                                }`}
+                              >
+                                {log.type === 'call'
+                                  ? 'Call Clicked'
+                                  : log.type === 'whatsapp'
+                                  ? 'WhatsApp Clicked'
+                                  : 'Profile View'}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
+                              <span>
+                                {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.timestamp).toLocaleDateString()}
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Complaint Button & Action */}
+                        <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 pt-1 sm:pt-0">
+                          <a
+                            href={mailtoUrl}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-700 hover:text-red-800 border border-red-200 hover:border-red-300 rounded-xl text-xs font-bold transition-all active:scale-[0.98] shadow-2xs"
+                            title={`Send Complaint to Admin regarding Customer ${custId}`}
+                          >
+                            <Flag size={13} className="text-red-600" />
+                            <span>Complaint</span>
+                            <Mail size={12} className="text-red-500 opacity-70 ml-0.5" />
+                          </a>
                         </div>
                       </div>
-                      <span className="text-[11px] text-slate-400 font-mono">
-                        {new Date(log.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • {new Date(log.timestamp).toLocaleDateString()}
-                      </span>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>

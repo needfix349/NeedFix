@@ -27,6 +27,7 @@ import { VerifiedBadge } from '../common/VerifiedBadge';
 import { CategoryLogo } from '../common/CategoryLogo';
 import { calculateDistanceKm } from '../../services/locationService';
 import { storageService } from '../../services/storage';
+import { deviceSecurityService } from '../../services/deviceSecurityService';
 
 interface TechnicianDetailModalProps {
   technician: TechnicianProfile;
@@ -76,9 +77,21 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
       )
     : null;
 
+  const getCustomerInfo = () => {
+    const custId = deviceSecurityService.getCustomerId();
+    const custName =
+      currentUser?.name ||
+      localStorage.getItem('needfix_customer_custom_name') ||
+      'Customer';
+    return { customerId: custId, customerName: custName };
+  };
+
   const handleCall = () => {
+    const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: cust.customerId,
+      customerName: cust.customerName,
       type: 'call',
       metadata: { phone: technician.mobile },
     });
@@ -87,8 +100,11 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleCallForService = (serviceName: string) => {
+    const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: cust.customerId,
+      customerName: cust.customerName,
       type: 'call',
       metadata: { phone: technician.mobile, service: serviceName },
     });
@@ -97,8 +113,11 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsApp = () => {
+    const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: cust.customerId,
+      customerName: cust.customerName,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });
@@ -112,8 +131,11 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsAppForService = (serviceName: string) => {
+    const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: cust.customerId,
+      customerName: cust.customerName,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile, service: serviceName },
     });

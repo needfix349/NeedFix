@@ -867,7 +867,18 @@ class StorageService {
         timestamp: new Date().toISOString(),
       };
       logs.unshift(newLog);
-      localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify(logs.slice(0, 200)));
+      localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify(logs.slice(0, 300)));
+
+      // Sync to backend API
+      try {
+        fetch('/api/activity-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newLog),
+        }).catch(() => {});
+      } catch {
+        // ignore fetch failures
+      }
 
       // Update technician counters
       const tech = this.getTechnicianById(data.technicianId);
@@ -877,6 +888,7 @@ class StorageService {
         if (data.type === 'view') tech.profileViews = (tech.profileViews || 0) + 1;
         this.updateTechnicianProfile(tech);
       }
+      this.notify();
     } catch {
       // ignore
     }
@@ -889,6 +901,31 @@ class StorageService {
     } catch {
       return [];
     }
+  }
+
+  async fetchRemoteActivityLogs(technicianId?: string): Promise<ActivityLog[]> {
+    try {
+      const url = technicianId ? `/api/activity-logs?technicianId=${encodeURIComponent(technicianId)}` : '/api/activity-logs';
+      const res = await fetch(url);
+      if (res.ok) {
+        const remoteLogs: ActivityLog[] = await res.json();
+        if (Array.isArray(remoteLogs) && remoteLogs.length > 0) {
+          const localLogs: ActivityLog[] = JSON.parse(localStorage.getItem(KEYS.ACTIVITY_LOGS) || '[]');
+          const map = new Map<string, ActivityLog>();
+          remoteLogs.forEach((l) => map.set(l.id, l));
+          localLogs.forEach((l) => map.set(l.id, l));
+          const merged = Array.from(map.values()).sort(
+            (a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          localStorage.setItem(KEYS.ACTIVITY_LOGS, JSON.stringify(merged.slice(0, 300)));
+          this.notify();
+          return technicianId ? merged.filter((l) => l.technicianId === technicianId) : merged;
+        }
+      }
+    } catch (e) {
+      console.warn('Error fetching remote activity logs:', e);
+    }
+    return this.getActivityLogs(technicianId);
   }
 
   getAuditLogs(): AdminAuditLog[] {

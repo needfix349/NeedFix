@@ -547,11 +547,14 @@ export class SupabaseService {
         status: 'pending',
         is_approved: false,
         is_verified: false,
-        is_online: false,
+        is_online: true,
+        latitude: newProfile.location?.latitude || 28.6139,
+        longitude: newProfile.location?.longitude || 77.2090,
         rating: newProfile.rating || 5.0,
         rating_count: 0,
         review_count: 0,
         city: newProfile.location?.city || 'Delhi',
+        area: newProfile.location?.area || 'Central',
         address: newProfile.location?.address || 'Workshop',
         created_at: newProfile.appliedAt,
       };
@@ -574,7 +577,9 @@ export class SupabaseService {
             status: 'pending',
             is_blocked: false,
             is_verified: false,
-            is_online: false,
+            is_online: true,
+            latitude: newProfile.location?.latitude || 28.6139,
+            longitude: newProfile.location?.longitude || 77.2090,
             rating: 5.0,
             city: newProfile.location?.city || 'Delhi',
             address: newProfile.location?.address || 'Workshop',
@@ -639,6 +644,7 @@ export class SupabaseService {
             is_approved: isApproved,
             is_verified: isApproved,
             status: status,
+            is_online: isApproved ? true : false,
             approved_at: isApproved ? new Date().toISOString() : null,
             approved_by: isApproved ? adminName : null,
             rejection_reason: status === 'rejected' ? reason : null,
@@ -648,6 +654,116 @@ export class SupabaseService {
         console.warn('Supabase error updating technician approval status:', err);
       }
     }
+  }
+
+  /**
+   * Update technician online status across Supabase, Central Server API, and Local Storage
+   */
+  async updateTechnicianOnlineStatus(
+    technicianId: string,
+    isOnline: boolean
+  ): Promise<boolean> {
+    // 1. Update in local storage
+    const tech = storageService.getTechnicianById(technicianId);
+    if (tech) {
+      storageService.updateTechnicianProfile({ ...tech, isOnline });
+    }
+
+    // 2. Sync to Central Server API
+    try {
+      fetch(`/api/technicians/${technicianId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isOnline, is_online: isOnline }),
+      }).catch((e) => console.warn('API /api/technicians online update error:', e));
+    } catch {}
+
+    // 3. Persist to Supabase PostgreSQL
+    if (isSupabaseConfigured()) {
+      try {
+        const { error } = await supabase
+          .from('technicians')
+          .update({
+            is_online: isOnline,
+            updated_at: new Date().toISOString(),
+          })
+          .or(`id.eq.${technicianId},user_id.eq.${technicianId}`);
+
+        if (error) {
+          console.warn('Supabase updateTechnicianOnlineStatus notice:', error.message);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.warn('Supabase updateTechnicianOnlineStatus exception:', err);
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Update full technician profile (GPS location, address, rates, services) in Supabase and server
+   */
+  async updateTechnicianProfile(tech: TechnicianProfile): Promise<boolean> {
+    // 1. Update in local storage
+    storageService.updateTechnicianProfile(tech);
+
+    // 2. Sync to Central Server API
+    try {
+      fetch(`/api/technicians/${tech.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tech),
+      }).catch((e) => console.warn('API /api/technicians profile update error:', e));
+    } catch {}
+
+    // 3. Persist to Supabase PostgreSQL
+    if (isSupabaseConfigured()) {
+      try {
+        const payload: Record<string, any> = {
+          full_name: tech.fullName,
+          company_name: tech.companyName || tech.fullName,
+          business_name: tech.companyName || tech.fullName,
+          mobile: tech.mobile,
+          whatsapp_number: tech.whatsappNumber || tech.mobile,
+          category_id: tech.categoryId,
+          category_name: tech.categoryName,
+          category_ids: tech.categoryIds || [tech.categoryId],
+          services_offered: tech.servicesOffered || [],
+          business_description: tech.businessDescription,
+          starting_price: tech.startingPrice,
+          inspection_fee: tech.inspectionFee || tech.startingPrice,
+          price_unit: tech.priceUnit || 'visit',
+          coverage_radius_km: tech.coverageRadiusKm,
+          coverage_area_text: tech.coverageAreaText,
+          latitude: tech.location?.latitude,
+          longitude: tech.location?.longitude,
+          city: tech.location?.city,
+          area: tech.location?.area,
+          address: tech.location?.address,
+          is_online: tech.isOnline,
+          profile_photo_url: tech.profilePhotoUrl,
+          company_logo_url: tech.companyLogoUrl,
+          updated_at: new Date().toISOString(),
+        };
+
+        const { error } = await supabase
+          .from('technicians')
+          .update(payload)
+          .or(`id.eq.${tech.id},user_id.eq.${tech.id}`);
+
+        if (error) {
+          console.warn('Supabase updateTechnicianProfile notice:', error.message);
+          return false;
+        }
+        return true;
+      } catch (err) {
+        console.warn('Supabase updateTechnicianProfile exception:', err);
+        return false;
+      }
+    }
+    return true;
   }
 
   /**

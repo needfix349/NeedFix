@@ -15,6 +15,7 @@ import { TechnicianProfile, UserLocation, UserProfile } from '../../types';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { calculateDistanceKm } from '../../services/locationService';
 import { storageService } from '../../services/storage';
+import { deviceSecurityService } from '../../services/deviceSecurityService';
 import { SERVICE_CATEGORIES } from '../../data/categories';
 import { CategoryLogo } from '../common/CategoryLogo';
 
@@ -52,8 +53,16 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleCallClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const custId = deviceSecurityService.getCustomerId();
+    const custName =
+      currentUser?.name ||
+      localStorage.getItem('needfix_customer_custom_name') ||
+      'Customer';
+
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: custId,
+      customerName: custName,
       type: 'call',
       metadata: { phone: technician.mobile },
     });
@@ -64,8 +73,16 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    const custId = deviceSecurityService.getCustomerId();
+    const custName =
+      currentUser?.name ||
+      localStorage.getItem('needfix_customer_custom_name') ||
+      'Customer';
+
     storageService.logActivity({
       technicianId: technician.id,
+      customerId: custId,
+      customerName: custName,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });
@@ -147,10 +164,18 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
               alt={technician.companyName || technician.fullName}
               className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs group-hover:scale-105 transition-transform"
             />
-            {technician.isOnline && (
+            {technician.isOnline ? (
               <span
-                title="Available Now"
-                className="absolute -bottom-1 -right-1 w-4 h-4 bg-emerald-500 border-2 border-white rounded-full"
+                title="Live Now & Accepting Leads"
+                className="absolute -bottom-1 -right-1 flex h-4 w-4"
+              >
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white"></span>
+              </span>
+            ) : (
+              <span
+                title="Currently Offline"
+                className="absolute -bottom-1 -right-1 w-3.5 h-3.5 bg-slate-400 border-2 border-white rounded-full"
               />
             )}
           </div>

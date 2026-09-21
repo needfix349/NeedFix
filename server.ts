@@ -8,6 +8,7 @@ const TECHS_FILE = path.join(DATA_DIR, 'technicians.json');
 const CUSTOMERS_FILE = path.join(DATA_DIR, 'customers.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const AUDIT_FILE = path.join(DATA_DIR, 'audit_logs.json');
+const ACTIVITY_FILE = path.join(DATA_DIR, 'activity_logs.json');
 
 // Ensure data directory and files exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -309,6 +310,35 @@ async function startServer() {
     });
     writeJsonFile(AUDIT_FILE, logs.slice(0, 500));
     res.json({ success: true });
+  });
+
+  // ==========================================
+  // ACTIVITY LOGS API (Call, WhatsApp, Views)
+  // ==========================================
+
+  app.get('/api/activity-logs', (req, res) => {
+    const { technicianId } = req.query;
+    const logs = readJsonFile<any[]>(ACTIVITY_FILE, []);
+    if (technicianId && typeof technicianId === 'string') {
+      return res.json(logs.filter((l) => l.technicianId === technicianId));
+    }
+    res.json(logs);
+  });
+
+  app.post('/api/activity-logs', (req, res) => {
+    const newLog = req.body;
+    if (!newLog || !newLog.technicianId) {
+      return res.status(400).json({ error: 'technicianId is required' });
+    }
+    const logs = readJsonFile<any[]>(ACTIVITY_FILE, []);
+    const logItem = {
+      ...newLog,
+      id: newLog.id || `act_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: newLog.timestamp || new Date().toISOString(),
+    };
+    logs.unshift(logItem);
+    writeJsonFile(ACTIVITY_FILE, logs.slice(0, 1000));
+    res.json(logItem);
   });
 
   // ==========================================

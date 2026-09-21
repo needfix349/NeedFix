@@ -128,19 +128,47 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
     }
   };
 
-  // Geofenced Nearby Technicians: Filtered strictly within selected radius (Min: 1 KM, Max: 20 KM, Default: 5 KM) using get_nearby_technicians
-  const nearbyApprovedTechnicians = useMemo(() => {
-    return get_nearby_technicians(
-      technicians,
-      currentLocation.latitude,
-      currentLocation.longitude,
-      searchRadiusKm
-    );
-  }, [technicians, currentLocation.latitude, currentLocation.longitude, searchRadiusKm]);
+  // 1. All valid approved technicians in system with distance calculated from customer location
+  const allApprovedWithDistance = useMemo(() => {
+    return technicians
+      .filter((t) => (t.isApproved === true || t.status === 'approved') && !t.isBlocked)
+      .map((tech) => {
+        const techLat = Number(tech.location?.latitude);
+        const techLng = Number(tech.location?.longitude);
+        const dist =
+          !isNaN(techLat) && !isNaN(techLng)
+            ? calculateDistanceKm(
+                currentLocation.latitude,
+                currentLocation.longitude,
+                techLat,
+                techLng
+              )
+            : 0;
+        return {
+          ...tech,
+          calculatedDistanceKm: dist,
+        };
+      })
+      .sort((a, b) => a.calculatedDistanceKm - b.calculatedDistanceKm);
+  }, [technicians, currentLocation.latitude, currentLocation.longitude]);
+
+  // 2. Technicians strictly within selected searchRadiusKm
+  const strictlyNearbyTechnicians = useMemo(() => {
+    return allApprovedWithDistance.filter((t) => t.calculatedDistanceKm <= searchRadiusKm);
+  }, [allApprovedWithDistance, searchRadiusKm]);
+
+  // Determine whether we fall back to network-wide list if no technicians are within radius
+  const isFallbackToNetwork = strictlyNearbyTechnicians.length === 0 && allApprovedWithDistance.length > 0;
 
   // Filtered and sorted technicians
   const filteredTechnicians = useMemo(() => {
-    return nearbyApprovedTechnicians
+    // If user typed a search query or no technicians are strictly within radius, search against all approved
+    const candidateList =
+      searchQuery.trim() || strictlyNearbyTechnicians.length === 0
+        ? allApprovedWithDistance
+        : strictlyNearbyTechnicians;
+
+    return candidateList
       .filter((tech) => {
         if (showOnlyFavorites && !favorites.includes(tech.id)) return false;
         
@@ -177,36 +205,27 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
         return true;
       })
       .sort((a, b) => {
-        // Native GPS Proximity calculation: closest technician to customer's GPS is always FIRST!
-        const distA =
-          a.calculatedDistanceKm ??
-          calculateDistanceKm(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            a.location.latitude,
-            a.location.longitude
-          );
-        const distB =
-          b.calculatedDistanceKm ??
-          calculateDistanceKm(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            b.location.latitude,
-            b.location.longitude
-          );
+        // 1. Live Online Technicians ALWAYS prioritized at the top!
+        const onlineA = a.isOnline ? 1 : 0;
+        const onlineB = b.isOnline ? 1 : 0;
+        if (onlineA !== onlineB) return onlineB - onlineA;
 
-        // Proximity priority: closest to current GPS comes first
-        if (distA !== distB) return distA - distB;
+        // 2. Proximity priority: closest to current GPS comes first
+        if (a.calculatedDistanceKm !== b.calculatedDistanceKm) {
+          return a.calculatedDistanceKm - b.calculatedDistanceKm;
+        }
+
+        // 3. Rating priority
         return b.rating - a.rating;
       });
   }, [
-    nearbyApprovedTechnicians,
+    strictlyNearbyTechnicians,
+    allApprovedWithDistance,
     showOnlyFavorites,
     favorites,
     selectedCategory,
     minRating,
     searchQuery,
-    currentLocation,
   ]);
 
   const activeCategoryObj = SERVICE_CATEGORIES.find((c) => c.id === selectedCategory);
@@ -525,8 +544,10 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             </h3>
             <p className="text-xs text-slate-500">
               {filteredTechnicians.length > 0
-                ? `Showing ${filteredTechnicians.length} verified specialist${filteredTechnicians.length > 1 ? 's' : ''} active within ${searchRadiusKm} KM of ${currentLocation.city}${currentLocation.state ? `, ${currentLocation.state}` : ''}`
-                : `No active technicians found within ${searchRadiusKm} KM of ${currentLocation.city}`}
+                ? isFallbackToNetwork && !searchQuery.trim()
+                  ? `Showing nearest verified specialists (${filteredTechnicians.length}) across our network (None within ${searchRadiusKm} KM of ${currentLocation.city})`
+                  : `Showing ${filteredTechnicians.length} verified specialist${filteredTechnicians.length > 1 ? 's' : ''} ${searchQuery.trim() ? 'matching your search' : `active within ${searchRadiusKm} KM of ${currentLocation.city}`}`
+                : `No active technicians found for the selected criteria`}
             </p>
           </div>
 
@@ -540,6 +561,29 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
             </button>
           )}
         </div>
+
+        {/* Helpful Fallback Banner if Outside Strict Radius */}
+        {isFallbackToNetwork && !searchQuery.trim() && filteredTechnicians.length > 0 && (
+          <div className="mb-4 p-3.5 rounded-2xl bg-blue-50/80 border border-blue-200 text-blue-900 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-xs">
+            <div className="flex items-center gap-2">
+              <span className="p-1 rounded-lg bg-blue-600 text-white shrink-0">
+                <MapPin size={13} />
+              </span>
+              <span>
+                <strong>Nearest Available Specialists:</strong> No registered technicians are within {searchRadiusKm} KM of <strong>{currentLocation.city}</strong>. Below are the closest verified providers from our network, sorted nearest first.
+              </span>
+            </div>
+            {searchRadiusKm < 20 && (
+              <button
+                type="button"
+                onClick={() => handleRadiusChange(20)}
+                className="py-1 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shrink-0 self-start sm:self-auto cursor-pointer"
+              >
+                Expand to 20 KM
+              </button>
+            )}
+          </div>
+        )}
 
         {filteredTechnicians.length === 0 ? (
           <div className="py-10 text-center bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 space-y-3 shadow-2xs">
