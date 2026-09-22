@@ -9,6 +9,7 @@ const CUSTOMERS_FILE = path.join(DATA_DIR, 'customers.json');
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
 const AUDIT_FILE = path.join(DATA_DIR, 'audit_logs.json');
 const ACTIVITY_FILE = path.join(DATA_DIR, 'activity_logs.json');
+const BLOCKED_DEVICES_FILE = path.join(DATA_DIR, 'blocked_devices.json');
 
 // Ensure data directory and files exist
 if (!fs.existsSync(DATA_DIR)) {
@@ -339,6 +340,51 @@ async function startServer() {
     logs.unshift(logItem);
     writeJsonFile(ACTIVITY_FILE, logs.slice(0, 1000));
     res.json(logItem);
+  });
+
+  // ==========================================
+  // BLOCKED DEVICES & BLACKLIST API
+  // ==========================================
+
+  app.get('/api/blocked-devices', (_req, res) => {
+    const list = readJsonFile<any[]>(BLOCKED_DEVICES_FILE, []);
+    res.json(list);
+  });
+
+  app.post('/api/blocked-devices', (req, res) => {
+    const record = req.body;
+    if (!record || !record.uniqueId) {
+      return res.status(400).json({ error: 'uniqueId is required' });
+    }
+    const list = readJsonFile<any[]>(BLOCKED_DEVICES_FILE, []);
+    const filtered = list.filter(
+      (b) =>
+        b.uniqueId !== record.uniqueId &&
+        (!record.deviceId || b.deviceId !== record.deviceId) &&
+        (!record.ipAddress || b.ipAddress !== record.ipAddress)
+    );
+    filtered.unshift({
+      ...record,
+      id: record.id || `block_${Date.now()}`,
+      blockedAt: record.blockedAt || new Date().toISOString(),
+    });
+    writeJsonFile(BLOCKED_DEVICES_FILE, filtered);
+    res.json({ success: true, record });
+  });
+
+  app.delete('/api/blocked-devices/:id', (req, res) => {
+    const id = req.params.id;
+    const list = readJsonFile<any[]>(BLOCKED_DEVICES_FILE, []);
+    const filtered = list.filter(
+      (b) =>
+        b.id !== id &&
+        b.uniqueId !== id &&
+        b.targetId !== id &&
+        b.deviceId !== id &&
+        b.ipAddress !== id
+    );
+    writeJsonFile(BLOCKED_DEVICES_FILE, filtered);
+    res.json({ success: true });
   });
 
   // ==========================================

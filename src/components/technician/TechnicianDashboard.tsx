@@ -266,13 +266,13 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       {
         id: `srv_${Date.now()}`,
         name: newServiceName.trim(),
-        price: Number(newServicePrice) || 299,
+        price: 0,
         description: newServiceDesc.trim() || undefined,
         photoUrl: newServicePhotoUrl || undefined,
       },
     ]);
     setNewServiceName('');
-    setNewServicePrice(299);
+    setNewServicePrice(0);
     setNewServiceDesc('');
     setNewServicePhotoUrl('');
     setNewServiceFileName('');
@@ -1021,15 +1021,15 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 onChange={handleEditItemFileChange}
               />
 
-              {/* Service Items & Price Rate Card */}
+              {/* Service Items / Work Catalog */}
               <div className="pt-2">
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Work Catalog & Price List (काम और रेट लिस्ट)
+                      Work Catalog (काम की लिस्ट)
                     </label>
                     <p className="text-[11px] text-slate-500">
-                      Mention the exact work name, standard price (₹), and a photo of your work.
+                      Mention the work name, details, and upload photos of your past work.
                     </p>
                   </div>
                   <span className="text-[11px] font-bold text-blue-700 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
@@ -1042,7 +1042,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                   {editServices.map((srv, idx) => (
                     <div
                       key={srv.id || idx}
-                      className="p-3 bg-slate-50 hover:bg-slate-100/80 transition-colors rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs"
+                      className="p-3 bg-slate-50 hover:bg-slate-100/80 transition-colors rounded-2xl border border-slate-200 flex items-center justify-between gap-3 text-xs"
                     >
                       {/* Work Photo & Title */}
                       <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -1083,7 +1083,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                               setEditingPhotoIndex(idx);
                               editItemFileInputRef.current?.click();
                             }}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1"
+                            className="text-[10px] text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1 mt-1 cursor-pointer"
                           >
                             <Camera size={10} />
                             <span>{srv.photoUrl ? 'Change Work Photo' : '+ Add Work Photo'}</span>
@@ -1091,22 +1091,12 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                         </div>
                       </div>
 
-                      {/* Price & Actions */}
-                      <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                        <div className="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-slate-300">
-                          <span className="font-bold text-slate-600 font-mono">₹</span>
-                          <input
-                            type="number"
-                            value={srv.price}
-                            onChange={(e) => handleUpdateServicePrice(idx, Number(e.target.value))}
-                            className="w-16 font-mono font-bold text-slate-900 text-xs outline-none"
-                            placeholder="Price"
-                          />
-                        </div>
+                      {/* Actions */}
+                      <div className="flex items-center gap-2 shrink-0">
                         <button
                           type="button"
                           onClick={() => handleRemoveServiceItem(idx)}
-                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors"
+                          className="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
                           title="Remove service"
                         >
                           <Trash2 size={15} />
@@ -1117,47 +1107,29 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
                   {editServices.length === 0 && (
                     <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-2xl text-slate-500 text-xs">
-                      No services listed yet. Add your first service below with price and photo.
+                      No services listed yet. Add your work details and photos below.
                     </div>
                   )}
                 </div>
 
-                {/* Add New Work / Service with Price and Photo */}
+                {/* Add New Work / Service */}
                 <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
                   <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
                     <Plus size={15} className="text-blue-600" />
-                    <span>Add New Work Service (नया काम, रेट और फोटो जोड़ें)</span>
+                    <span>Add New Work Service (नया काम और फोटो जोड़ें)</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                    <div className="sm:col-span-2">
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Work / Service Name *
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Inverter Split AC Jet Wash & Gas Check"
-                        value={newServiceName}
-                        onChange={(e) => setNewServiceName(e.target.value)}
-                        className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-[11px] font-semibold text-slate-700 mb-1">
-                        Price (₹) *
-                      </label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-slate-500 font-mono font-bold text-xs">₹</span>
-                        <input
-                          type="number"
-                          placeholder="499"
-                          value={newServicePrice}
-                          onChange={(e) => setNewServicePrice(Number(e.target.value))}
-                          className="w-full pl-7 p-2.5 text-xs bg-white border border-slate-300 rounded-xl outline-none font-mono font-bold focus:border-blue-600"
-                        />
-                      </div>
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 mb-1">
+                      Work / Service Name *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Inverter Split AC Jet Wash & Gas Check"
+                      value={newServiceName}
+                      onChange={(e) => setNewServiceName(e.target.value)}
+                      className="w-full p-2.5 text-xs bg-white border border-slate-300 rounded-xl outline-none focus:border-blue-600"
+                    />
                   </div>
 
                   <div>

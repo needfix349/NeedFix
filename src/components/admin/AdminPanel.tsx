@@ -158,7 +158,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     () => technicians.filter((t) => t.status === 'approved' && !t.isBlocked),
     [technicians]
   );
-  const blockedTechs = useMemo(() => technicians.filter((t) => t.isBlocked), [technicians]);
+  const blockedTechs = useMemo(
+    () => technicians.filter((t) => Boolean(t.isBlocked || t.status === 'blocked')),
+    [technicians]
+  );
   const rejectedTechs = useMemo(() => technicians.filter((t) => t.status === 'rejected'), [technicians]);
   const suspendedTechs = useMemo(() => technicians.filter((t) => t.status === 'suspended'), [technicians]);
 
@@ -228,14 +231,28 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // One-Click Block / Unblock
   const handleToggleBlock = async (tech: TechnicianProfile) => {
-    if (tech.isBlocked) {
-      // Instant Unblock
+    const isCurrentlyBlocked = Boolean(tech.isBlocked || tech.status === 'blocked');
+    if (isCurrentlyBlocked) {
+      // Instant Unblock with optimistic UI update
+      setTechnicians((prev) =>
+        prev.map((t) =>
+          t.id === tech.id || t.technicianCode === tech.technicianCode
+            ? {
+                ...t,
+                isBlocked: false,
+                status: 'approved',
+                blockedReason: undefined,
+                blockedAt: undefined,
+              }
+            : t
+        )
+      );
       await supabaseService.toggleTechnicianBlockStatus(
         tech.id,
         currentUser?.name || 'NeedFix Admin Desk',
         'Technician restored and unblocked by Admin'
       );
-      loadData();
+      await loadData();
       if (selectedTech?.id === tech.id) {
         setSelectedTech(storageService.getTechnicianById(tech.id) || null);
       }
@@ -248,16 +265,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   const handleConfirmBlock = async () => {
     if (!techToBlock) return;
-    await supabaseService.toggleTechnicianBlockStatus(
-      techToBlock.id,
-      currentUser?.name || 'NeedFix Admin Desk',
-      blockReason
+    const target = techToBlock;
+    const reason = blockReason || 'Blocked by NeedFix Admin Desk';
+
+    // Optimistic UI update: immediately show technician as blocked in Admin UI
+    setTechnicians((prev) =>
+      prev.map((t) =>
+        t.id === target.id || t.technicianCode === target.technicianCode
+          ? {
+              ...t,
+              isBlocked: true,
+              status: 'blocked',
+              blockedReason: reason,
+              blockedAt: new Date().toISOString(),
+              isOnline: false,
+            }
+          : t
+      )
     );
+
     setShowBlockModal(false);
     setTechToBlock(null);
-    loadData();
-    if (selectedTech?.id === techToBlock.id) {
-      setSelectedTech(storageService.getTechnicianById(techToBlock.id) || null);
+
+    await supabaseService.toggleTechnicianBlockStatus(
+      target.id,
+      currentUser?.name || 'NeedFix Admin Desk',
+      reason
+    );
+    await loadData();
+    if (selectedTech?.id === target.id) {
+      setSelectedTech(storageService.getTechnicianById(target.id) || null);
     }
   };
 
@@ -302,12 +339,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     return technicians
       .filter((t) => {
         // Tab filter
+        const isBlocked = Boolean(t.isBlocked || t.status === 'blocked');
         const isPending =
           (t.status === 'pending' || (!t.isApproved && t.status !== 'rejected' && t.status !== 'suspended')) &&
-          !t.isBlocked;
+          !isBlocked;
 
         if (activeTab === 'pending' && !isPending) return false;
-        if (activeTab === 'blocked' && !t.isBlocked) return false;
+        if (activeTab === 'blocked' && !isBlocked) return false;
         if (activeTab === 'all' && statusFilter !== 'all' && t.status !== statusFilter) return false;
 
         // Category filter
@@ -881,13 +919,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             ) : (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {filteredTechnicians.map((tech) => {
-                  const isBlocked = Boolean(tech.isBlocked);
+                  const isBlocked = Boolean(tech.isBlocked || tech.status === 'blocked');
                   return (
                     <div
                       key={tech.id}
                       className={`p-4 rounded-2xl border transition-all flex flex-col justify-between ${
                         isBlocked
-                          ? 'bg-red-50/50 border-red-300 shadow-xs'
+                          ? 'bg-red-50 border-2 border-red-500 shadow-md ring-1 ring-red-300'
                           : tech.status === 'pending'
                           ? 'bg-amber-50/40 border-amber-300/80 shadow-xs'
                           : tech.status === 'approved'
@@ -896,6 +934,19 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                       }`}
                     >
                       <div>
+                        {/* Top banner if Blocked */}
+                        {isBlocked && (
+                          <div className="mb-3 p-2 bg-red-600 text-white rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-xs">
+                            <div className="flex items-center gap-1.5">
+                              <Ban size={14} className="shrink-0" />
+                              <span>🚨 BLOCKED / BLACKLISTED ID</span>
+                            </div>
+                            <span className="text-[10px] bg-red-800 px-2 py-0.5 rounded text-red-100 font-mono truncate max-w-[200px]">
+                              {tech.blockedReason || 'Blocked by Admin'}
+                            </span>
+                          </div>
+                        )}
+
                         {/* Header card info with Auto Technician ID */}
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3">

@@ -394,7 +394,7 @@ class StorageService {
           map.set(p.id, p);
         } else {
           const curr = map.get(p.id)!;
-          if (curr.status !== 'approved' && p.status === 'pending') {
+          if (!curr.isBlocked && curr.status !== 'approved' && p.status === 'pending') {
             map.set(p.id, { ...curr, status: 'pending', isApproved: false });
           }
         }
@@ -402,11 +402,26 @@ class StorageService {
 
       const merged = Array.from(map.values());
 
+      // Cross-check with universal blocked devices / blacklist
+      const blockedDevices = this.getBlockedDevices();
+      const blockedIds = new Set<string>();
+      blockedDevices.forEach((b) => {
+        if (b.uniqueId) blockedIds.add(b.uniqueId.toLowerCase());
+        if (b.targetId) blockedIds.add(b.targetId.toLowerCase());
+      });
+
       // Ensure every technician has a valid unique technicianCode (e.g. NF-TECH-1001)
       let counter = 1001;
       for (const tech of merged) {
         if (!tech.technicianCode) {
           tech.technicianCode = `NF-TECH-${counter++}`;
+        }
+        const codeLow = (tech.technicianCode || '').toLowerCase();
+        const idLow = (tech.id || '').toLowerCase();
+        if (tech.isBlocked || blockedIds.has(codeLow) || blockedIds.has(idLow)) {
+          tech.isBlocked = true;
+          tech.status = 'blocked';
+          tech.isOnline = false;
         }
       }
       return merged;
@@ -645,9 +660,19 @@ class StorageService {
 
     try {
       const primary: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.TECHNICIANS) || '[]');
-      const idx = primary.findIndex((t) => t.id === tech.id || t.userId === tech.userId);
+      const idx = primary.findIndex((t) => t.id === tech.id || t.userId === tech.userId || (t.technicianCode && tech.technicianCode && t.technicianCode.toLowerCase() === tech.technicianCode.toLowerCase()));
       if (idx >= 0) {
-        primary[idx] = { ...primary[idx], ...tech };
+        // IMPORTANT: Never let remote overwrite an existing local blocked status to unblocked!
+        const wasBlocked = primary[idx].isBlocked || primary[idx].status === 'blocked';
+        primary[idx] = {
+          ...primary[idx],
+          ...tech,
+          isBlocked: wasBlocked ? true : Boolean(tech.isBlocked),
+          status: wasBlocked ? 'blocked' : (tech.status || primary[idx].status),
+          blockedReason: wasBlocked ? (primary[idx].blockedReason || tech.blockedReason) : tech.blockedReason,
+          blockedAt: wasBlocked ? (primary[idx].blockedAt || tech.blockedAt) : tech.blockedAt,
+          isOnline: wasBlocked ? false : (tech.isOnline ?? primary[idx].isOnline),
+        };
       } else {
         primary.unshift(tech);
       }
@@ -655,9 +680,12 @@ class StorageService {
 
       // Also update pending list
       const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
-      const pIdx = pending.findIndex((p) => p.id === tech.id || p.userId === tech.userId);
+      const pIdx = pending.findIndex((p) => p.id === tech.id || p.userId === tech.userId || (p.technicianCode && tech.technicianCode && p.technicianCode.toLowerCase() === tech.technicianCode.toLowerCase()));
       if (pIdx >= 0) {
-        if (tech.status === 'approved' || tech.isApproved) {
+        const wasBlocked = pending[pIdx].isBlocked || pending[pIdx].status === 'blocked';
+        if (wasBlocked) {
+          pending[pIdx] = { ...pending[pIdx], ...tech, isBlocked: true, status: 'blocked', isApproved: false };
+        } else if (tech.status === 'approved' || tech.isApproved) {
           pending[pIdx] = { ...pending[pIdx], ...tech, status: 'approved', isApproved: true };
         } else {
           pending[pIdx] = { ...pending[pIdx], ...tech };
@@ -691,7 +719,12 @@ class StorageService {
     reason?: string
   ): TechnicianProfile | undefined {
     const technicians = this.getTechnicians();
-    const tech = technicians.find((t) => t.id === technicianId);
+    const tech = technicians.find(
+      (t) =>
+        t.id === technicianId ||
+        t.userId === technicianId ||
+        (t.technicianCode && t.technicianCode.toLowerCase() === technicianId.toLowerCase())
+    );
     if (!tech) return undefined;
 
     const willBeBlocked = !tech.isBlocked;
@@ -708,6 +741,70 @@ class StorageService {
     }
 
     localStorage.setItem(KEYS.TECHNICIANS, JSON.stringify(technicians));
+
+    // Update pending list as well
+    try {
+      const pending: TechnicianProfile[] = JSON.parse(localStorage.getItem(KEYS.PENDING_APPLICATIONS) || '[]');
+      const pIdx = pending.findIndex((p) => p.id === tech.id || p.userId === tech.userId || p.technicianCode === tech.technicianCode);
+      if (pIdx >= 0) {
+        pending[pIdx] = {
+          ...pending[pIdx],
+          isBlocked: willBeBlocked,
+          status: willBeBlocked ? 'blocked' : 'approved',
+          blockedAt: tech.blockedAt,
+          blockedReason: tech.blockedReason,
+          isOnline: willBeBlocked ? false : pending[pIdx].isOnline,
+        };
+        localStorage.setItem(KEYS.PENDING_APPLICATIONS, JSON.stringify(pending));
+      }
+    } catch (e) {
+      console.warn('Pending update note:', e);
+    }
+
+    // Universal Blacklist & Blocked Devices Sync
+    if (willBeBlocked) {
+      const blockRecord: BlockedDeviceRecord = {
+        id: `block_${tech.id}_${Date.now()}`,
+        deviceId: tech.deviceId || `DEV_${tech.id}`,
+        ipAddress: tech.ipAddress || '127.0.0.1',
+        targetType: 'technician',
+        targetId: tech.id,
+        uniqueId: tech.technicianCode || tech.id,
+        targetName: tech.fullName || tech.companyName,
+        targetPhone: tech.mobile,
+        reason: tech.blockedReason || 'Blocked by NeedFix Admin Desk',
+        blockedBy: adminName,
+        blockedAt: tech.blockedAt || new Date().toISOString(),
+      };
+      this.addBlockedDevice(blockRecord);
+
+      // Async backend sync
+      fetch('/api/blocked-devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(blockRecord),
+      }).catch(console.warn);
+    } else {
+      if (tech.technicianCode) {
+        this.removeBlockedDevice(tech.technicianCode);
+        fetch(`/api/blocked-devices/${tech.technicianCode}`, { method: 'DELETE' }).catch(console.warn);
+      }
+      this.removeBlockedDevice(tech.id);
+      fetch(`/api/blocked-devices/${tech.id}`, { method: 'DELETE' }).catch(console.warn);
+    }
+
+    // Direct server-side API sync
+    fetch(`/api/technicians/${tech.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        isBlocked: willBeBlocked,
+        status: willBeBlocked ? 'blocked' : 'approved',
+        blockedAt: tech.blockedAt,
+        blockedReason: tech.blockedReason,
+        isOnline: willBeBlocked ? false : tech.isOnline,
+      }),
+    }).catch(console.warn);
 
     // Also update linked user profile
     if (tech.userId) {

@@ -219,27 +219,82 @@ export class SupabaseService {
     const updated = storageService.toggleTechnicianBlockStatus(technicianId, adminName, reason);
     if (isSupabaseConfigured() && updated) {
       try {
-        await supabase
-          .from('technicians')
-          .update({
-            is_blocked: updated.isBlocked,
-            blocked_at: updated.blockedAt || null,
-            blocked_reason: updated.blockedReason || null,
-            is_online: updated.isBlocked ? false : updated.isOnline,
-          })
-          .eq('id', technicianId);
+        const isBlocked = Boolean(updated.isBlocked);
+        const effectiveStatus = isBlocked ? 'blocked' : 'approved';
+        const effectiveOnline = isBlocked ? false : Boolean(updated.isOnline);
 
-        await supabase.from('admin_audit_logs').insert({
-          id: `audit_${Date.now()}`,
-          admin_name: adminName,
-          technician_id: technicianId,
-          technician_name: updated.fullName,
-          action: updated.isBlocked ? 'suspended' : 'reactivated',
-          reason: updated.isBlocked
-            ? (reason || 'One-click Block / Blacklist applied by Admin')
-            : 'Technician unblocked / reinstated by Admin',
-          timestamp: new Date().toISOString(),
-        });
+        // Explicitly update technicians table in Supabase
+        // Supported columns: is_blocked (BOOLEAN), status (TEXT), is_online (BOOLEAN), rejection_reason (TEXT)
+        const idFilters = [
+          technicianId ? `id.eq.${technicianId}` : null,
+          updated.id ? `id.eq.${updated.id}` : null,
+          updated.userId ? `user_id.eq.${updated.userId}` : null,
+          updated.technicianCode ? `technician_code.eq.${updated.technicianCode}` : null,
+        ]
+          .filter(Boolean)
+          .filter((v, i, a) => a.indexOf(v) === i)
+          .join(',');
+
+        const updatePayload: Record<string, any> = {
+          is_blocked: isBlocked,
+          status: effectiveStatus,
+          is_online: effectiveOnline,
+        };
+        if (isBlocked && reason) {
+          updatePayload.rejection_reason = reason;
+        } else if (!isBlocked) {
+          updatePayload.rejection_reason = null;
+        }
+
+        const { error: techUpdateErr } = await supabase
+          .from('technicians')
+          .update(updatePayload)
+          .or(idFilters);
+
+        if (techUpdateErr) {
+          console.warn('Supabase technicians update error with rejection_reason, retrying minimal update:', techUpdateErr);
+          // Fallback with minimal safe columns: is_blocked, status, is_online
+          await supabase
+            .from('technicians')
+            .update({
+              is_blocked: isBlocked,
+              status: effectiveStatus,
+              is_online: effectiveOnline,
+            })
+            .or(idFilters);
+        }
+
+        // Also update linked user profile in 'users' table
+        const targetUserId = updated.userId || (technicianId.length > 30 ? technicianId : null);
+        if (targetUserId) {
+          try {
+            await supabase
+              .from('users')
+              .update({
+                status: effectiveStatus,
+              })
+              .eq('id', targetUserId);
+          } catch (userErr) {
+            console.warn('Supabase users status update notice:', userErr);
+          }
+        }
+
+        // Insert admin audit log
+        try {
+          await supabase.from('admin_audit_logs').insert({
+            id: `audit_${Date.now()}`,
+            admin_name: adminName,
+            technician_id: technicianId,
+            technician_name: updated.fullName || updated.companyName || 'Technician',
+            action: isBlocked ? 'suspended' : 'reactivated',
+            reason: isBlocked
+              ? (reason || 'One-click Block / Blacklist applied by Admin')
+              : 'Technician unblocked / reinstated by Admin',
+            timestamp: new Date().toISOString(),
+          });
+        } catch (auditErr) {
+          console.warn('Supabase admin_audit_logs notice:', auditErr);
+        }
       } catch (err) {
         console.warn('Supabase toggleTechnicianBlockStatus warning:', err);
       }
@@ -644,12 +699,13 @@ export class SupabaseService {
             is_approved: isApproved,
             is_verified: isApproved,
             status: status,
+            is_blocked: isApproved ? false : undefined,
             is_online: isApproved ? true : false,
             approved_at: isApproved ? new Date().toISOString() : null,
             approved_by: isApproved ? adminName : null,
             rejection_reason: status === 'rejected' ? reason : null,
           })
-          .eq('id', technicianId);
+          .or(`id.eq.${technicianId},technician_code.eq.${technicianId}`);
       } catch (err) {
         console.warn('Supabase error updating technician approval status:', err);
       }
@@ -992,6 +1048,13 @@ export class SupabaseService {
   async getAllTechniciansForAdmin(): Promise<TechnicianProfile[]> {
     let combined = [...storageService.getTechnicians()];
 
+    const blockedDevices = storageService.getBlockedDevices();
+    const blockedIds = new Set<string>();
+    blockedDevices.forEach((b) => {
+      if (b.uniqueId) blockedIds.add(b.uniqueId.toLowerCase());
+      if (b.targetId) blockedIds.add(b.targetId.toLowerCase());
+    });
+
     // 1. Fetch from Central Persistent Server API
     try {
       const apiRes = await fetch('/api/technicians');
@@ -1000,7 +1063,24 @@ export class SupabaseService {
         if (Array.isArray(apiTechs)) {
           const map = new Map<string, TechnicianProfile>();
           combined.forEach((t) => map.set(t.id, t));
-          apiTechs.forEach((t) => map.set(t.id, { ...map.get(t.id), ...t }));
+          apiTechs.forEach((t) => {
+            const existing = map.get(t.id);
+            const wasBlocked =
+              existing?.isBlocked ||
+              existing?.status === 'blocked' ||
+              blockedIds.has((t.technicianCode || '').toLowerCase()) ||
+              blockedIds.has((t.id || '').toLowerCase());
+            const isBlocked = wasBlocked || t.isBlocked || t.status === 'blocked';
+            map.set(t.id, {
+              ...existing,
+              ...t,
+              isBlocked: Boolean(isBlocked),
+              status: isBlocked ? 'blocked' : (t.status || existing?.status || 'approved'),
+              blockedReason: isBlocked ? (existing?.blockedReason || t.blockedReason) : undefined,
+              blockedAt: isBlocked ? (existing?.blockedAt || t.blockedAt) : undefined,
+              isOnline: isBlocked ? false : (t.isOnline ?? existing?.isOnline),
+            });
+          });
           combined = Array.from(map.values());
         }
       }
@@ -1101,7 +1181,20 @@ export class SupabaseService {
 
           data.forEach((d: any) => {
             const mapped = this.mapSupabaseRowToProfile(d);
-            map.set(d.id, { ...(map.get(d.id) || {}), ...mapped });
+            const existing = map.get(d.id);
+            // Supabase technicians table has explicit is_blocked column
+            const hasDbBoolean = typeof d.is_blocked === 'boolean';
+            const isBlocked = hasDbBoolean
+              ? Boolean(d.is_blocked || d.status === 'blocked')
+              : Boolean(existing?.isBlocked || mapped.isBlocked || blockedIds.has((mapped.technicianCode || '').toLowerCase()) || blockedIds.has((d.id || '').toLowerCase()));
+
+            map.set(d.id, {
+              ...(existing || {}),
+              ...mapped,
+              isBlocked: Boolean(isBlocked),
+              status: isBlocked ? 'blocked' : (mapped.status || existing?.status || 'approved'),
+              isOnline: isBlocked ? false : (mapped.isOnline ?? existing?.isOnline),
+            });
           });
           combined = Array.from(map.values());
         }
@@ -1110,11 +1203,18 @@ export class SupabaseService {
       }
     }
 
-    // Ensure all have valid sequential technicianCode
+    // Ensure all have valid sequential technicianCode and respect blocked state
     let codeIndex = 1;
     for (const tech of combined) {
       if (!tech.technicianCode || !tech.technicianCode.startsWith('TECH-')) {
         tech.technicianCode = `TECH-${codeIndex++}`;
+      }
+      const codeLow = (tech.technicianCode || '').toLowerCase();
+      const idLow = (tech.id || '').toLowerCase();
+      if (tech.isBlocked || (tech.isBlocked !== false && (blockedIds.has(codeLow) || blockedIds.has(idLow)))) {
+        tech.isBlocked = true;
+        tech.status = 'blocked';
+        tech.isOnline = false;
       }
     }
 

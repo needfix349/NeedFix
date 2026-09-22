@@ -514,19 +514,16 @@ class DeviceSecurityService {
     // 2. Sync to Supabase PostgreSQL 'blocked_devices' table
     if (isSupabaseConfigured()) {
       try {
-        await supabase.from('blocked_devices').insert({
-          id: record.id,
-          device_id: record.deviceId,
-          ip_address: record.ipAddress,
-          target_type: record.targetType,
-          target_id: record.targetId,
-          unique_id: record.uniqueId,
-          target_name: record.targetName,
-          target_phone: record.targetPhone || null,
-          reason: record.reason,
-          blocked_by: record.blockedBy,
-          blocked_at: record.blockedAt,
-        });
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        const validInstallId = [params.deviceId, record.deviceId, params.targetId]
+          .find((id) => id && isUuid.test(id));
+        if (validInstallId) {
+          await supabase.from('blocked_devices').insert({
+            installation_id: validInstallId,
+            reason: record.reason,
+            blocked_at: record.blockedAt || new Date().toISOString(),
+          });
+        }
 
         // Update target record status in Supabase
         if (params.targetType === 'customer') {
@@ -534,21 +531,25 @@ class DeviceSecurityService {
             .from('customers')
             .update({
               is_blocked: true,
-              blocked_reason: record.reason,
-              blocked_at: record.blockedAt,
             })
-            .eq('customer_id', params.uniqueId);
+            .eq('id', params.uniqueId);
         } else {
           await supabase
             .from('technicians')
             .update({
               is_blocked: true,
-              blocked_reason: record.reason,
-              blocked_at: record.blockedAt,
+              status: 'blocked',
               is_online: false,
+              rejection_reason: record.reason,
             })
             .or(`id.eq.${params.targetId},technician_code.eq.${params.uniqueId}`);
         }
+
+        // Also update users table status
+        await supabase
+          .from('users')
+          .update({ status: 'blocked' })
+          .or(`id.eq.${params.targetId},id.eq.${params.uniqueId},username.ilike.${params.uniqueId}`);
       } catch (err) {
         console.warn('Supabase blockUser sync exception:', err);
       }
@@ -586,29 +587,30 @@ class DeviceSecurityService {
     // 2. Remove from Supabase PostgreSQL
     if (isSupabaseConfigured()) {
       try {
-        await supabase
-          .from('blocked_devices')
-          .delete()
-          .or(
-            `unique_id.eq.${params.uniqueId},device_id.eq.${params.uniqueId},ip_address.eq.${params.uniqueId},id.eq.${params.uniqueId}`
-          );
+        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (isUuid.test(params.uniqueId)) {
+          await supabase
+            .from('blocked_devices')
+            .delete()
+            .or(`installation_id.eq.${params.uniqueId},id.eq.${params.uniqueId}`);
+        }
 
         if (params.targetType === 'customer' || params.uniqueId.startsWith('CUST-')) {
           await supabase
             .from('customers')
-            .update({ is_blocked: false, blocked_reason: null, blocked_at: null })
-            .eq('customer_id', params.uniqueId);
+            .update({ is_blocked: false })
+            .eq('id', params.uniqueId);
         } else {
           await supabase
             .from('technicians')
-            .update({ status: 'approved', is_blocked: false, blocked_reason: null, blocked_at: null })
+            .update({ status: 'approved', is_blocked: false, rejection_reason: null, is_online: true })
             .or(`technician_code.eq.${params.uniqueId},id.eq.${params.uniqueId}`);
         }
 
         // Restore user status to approved in users table
         await supabase
           .from('users')
-          .update({ status: 'approved', is_blocked: false, blocked_reason: null })
+          .update({ status: 'approved' })
           .or(`id.eq.${params.uniqueId},username.ilike.${params.uniqueId}`);
       } catch (err) {
         console.warn('Supabase unblockUser exception:', err);

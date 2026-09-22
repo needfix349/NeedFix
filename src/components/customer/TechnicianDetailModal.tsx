@@ -303,48 +303,58 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
         </div>
 
         {/* Scrollable Body Content */}
-        <div className="p-5 overflow-y-auto space-y-5 flex-1 text-slate-800">
-          {/* Quick Specifications Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Service Radius</span>
-              <p className="text-sm font-bold text-slate-900 mt-0.5">{technician.coverageRadiusKm} Km Coverage</p>
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 sm:space-y-4 flex-1 text-slate-800">
+          {/* Sleek Compact Specs (Service Radius, Working Hours, Rating) */}
+          <div className="grid grid-cols-3 gap-1.5 p-2 bg-slate-50 border border-slate-200 rounded-xl">
+            <div className="text-center px-1">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight block truncate">
+                Radius
+              </span>
+              <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">
+                {technician.coverageRadiusKm} Km
+              </p>
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Working Hours</span>
-              <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">{technician.workingHours || '8:30 AM - 8:30 PM'}</p>
+            <div className="text-center px-1 border-x border-slate-200">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight block truncate">
+                Working Time
+              </span>
+              <p className="text-xs font-bold text-slate-900 mt-0.5 truncate">
+                {technician.workingHours || '8:30 AM - 8:30 PM'}
+              </p>
             </div>
 
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-2xl">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block">Ratings Score</span>
-              <div className="flex items-center gap-1 mt-0.5">
-                <Star size={13} className="fill-amber-400 text-amber-400" />
-                <span className="text-sm font-bold text-slate-900">
+            <div className="text-center px-1 flex flex-col items-center justify-center">
+              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-tight block truncate">
+                Rating Score
+              </span>
+              <div className="flex items-center justify-center gap-1 mt-0.5">
+                <Star size={11} className="fill-amber-400 text-amber-400 shrink-0" />
+                <span className="text-xs font-bold text-slate-900">
                   {technician.rating > 0 ? technician.rating.toFixed(1) : 'New'}
                 </span>
-                <span className="text-xs text-slate-400">({reviews.length})</span>
+                <span className="text-[10px] text-slate-400">({reviews.length})</span>
               </div>
             </div>
           </div>
 
           {/* Business Bio / Description */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
               About & Service Expertise
             </h3>
-            <p className="text-xs sm:text-sm text-slate-700 leading-relaxed bg-slate-50 p-4 rounded-2xl border border-slate-200">
+            <p className="text-xs sm:text-[13px] text-slate-700 leading-relaxed bg-slate-50 p-3 rounded-xl border border-slate-200">
               {technician.businessDescription}
             </p>
           </div>
 
           {/* Service Localities */}
           <div>
-            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1.5">
               Service Areas Covered
             </h3>
-            <div className="flex items-start gap-2 bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs text-slate-700">
-              <MapPin size={16} className="text-red-500 shrink-0 mt-0.5" />
+            <div className="flex items-start gap-2 bg-slate-50 p-2.5 rounded-xl border border-slate-200 text-xs text-slate-700">
+              <MapPin size={15} className="text-red-500 shrink-0 mt-0.5" />
               <div>
                 <span className="font-bold text-slate-900 block">{technician.location.city} Region</span>
                 <p className="text-slate-600 mt-0.5">{technician.coverageAreaText || technician.location.area}</p>
