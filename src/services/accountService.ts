@@ -229,10 +229,20 @@ class AccountService {
       };
     }
 
-    const newCustomerId =
-      typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : `cust_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const generateValidUuid = (): string => {
+      if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+        try {
+          return crypto.randomUUID();
+        } catch {}
+      }
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === 'x' ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+      });
+    };
+
+    const newCustomerId = generateValidUuid();
     const nowIso = new Date().toISOString();
 
     const customerRecord: CustomerRecord = {
@@ -253,26 +263,40 @@ class AccountService {
     // Save to Supabase customers table
     if (isSupabaseConfigured()) {
       try {
-        const { error: insertErr } = await supabase.from('customers').insert([{
-          id: newCustomerId,
-          name: cleanName,
-          mobile_number: cleanMobile,
-          pin: cleanPin,
-          device_id: deviceId,
-          is_blocked: false,
-          created_at: nowIso,
-          last_seen_at: nowIso,
-        }]);
+        const { error: insertErr } = await supabase.from('customers').upsert(
+          [
+            {
+              id: newCustomerId,
+              name: cleanName,
+              mobile_number: cleanMobile,
+              pin: cleanPin,
+              device_id: deviceId,
+              is_blocked: false,
+              created_at: nowIso,
+              last_seen_at: nowIso,
+            },
+          ],
+          { onConflict: 'mobile_number' }
+        );
         if (insertErr) {
-          console.warn('Supabase customer insert notice:', insertErr.message);
+          console.warn('Supabase customer upsert notice:', insertErr.message);
         }
       } catch (err) {
-        console.warn('Supabase customer insert exception:', err);
+        console.warn('Supabase customer upsert exception:', err);
       }
     }
 
     // Save locally
     storageService.saveCustomer(customerRecord);
+
+    // Sync to Central Server API
+    try {
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerRecord),
+      }).catch((err) => console.warn('API /api/customers post error:', err));
+    } catch {}
 
     const userProfile: UserProfile = {
       id: newCustomerId,
@@ -404,6 +428,31 @@ class AccountService {
     };
 
     storageService.setCurrentUser(userProfile);
+
+    // Update customer record with phone and last seen
+    const nowIso = new Date().toISOString();
+    const customerRec: CustomerRecord = {
+      id: customerData.id || `cust_${cleanMobile}`,
+      customerId: customerData.customer_id || `CUST-${cleanMobile.slice(-4)}`,
+      name: customerData.name || 'Customer',
+      phone: cleanMobile,
+      mobile_number: cleanMobile,
+      deviceId: deviceId,
+      device_id: deviceId,
+      ipAddress: '',
+      isBlocked: false,
+      createdAt: customerData.created_at || nowIso,
+      lastSeenAt: nowIso,
+    };
+    storageService.saveCustomer(customerRec);
+
+    try {
+      fetch('/api/customers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(customerRec),
+      }).catch((e) => console.warn('API /api/customers login sync error:', e));
+    } catch {}
 
     return {
       success: true,

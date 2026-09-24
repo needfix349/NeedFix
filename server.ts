@@ -202,18 +202,34 @@ async function startServer() {
       custData.customerId = `CUST-${maxNum + 1}`;
     }
 
+    const rawPhone = custData.phone || custData.mobile_number || custData.mobile || '';
+    const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+
     const matchIndex = customers.findIndex(
       (c) =>
         (custData.id && c.id === custData.id) ||
         (custData.customerId && c.customerId === custData.customerId) ||
-        (custData.deviceId && c.deviceId === custData.deviceId) ||
-        (custData.phone && c.phone && custData.phone.replace(/\D/g, '') === c.phone.replace(/\D/g, ''))
+        (cleanPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === cleanPhone) ||
+        (cleanPhone && c.mobile_number && c.mobile_number.replace(/\D/g, '').slice(-10) === cleanPhone) ||
+        (custData.deviceId && c.deviceId === custData.deviceId)
     );
 
     if (matchIndex >= 0) {
+      const existing = customers[matchIndex];
+      const finalPhone = cleanPhone || existing.phone || existing.mobile_number || '';
+      const finalName =
+        custData.name && custData.name !== 'NeedFix Visitor'
+          ? custData.name
+          : existing.name && existing.name !== 'NeedFix Visitor'
+          ? existing.name
+          : custData.name || 'NeedFix Customer';
+
       customers[matchIndex] = {
-        ...customers[matchIndex],
+        ...existing,
         ...custData,
+        name: finalName,
+        phone: finalPhone,
+        mobile_number: finalPhone,
         lastSeenAt: new Date().toISOString(),
       };
       writeJsonFile(CUSTOMERS_FILE, customers);
@@ -223,7 +239,8 @@ async function startServer() {
         id: custData.id || `cust_${Date.now()}`,
         customerId: custData.customerId,
         name: custData.name || 'NeedFix Customer',
-        phone: custData.phone || '',
+        phone: cleanPhone,
+        mobile_number: cleanPhone,
         ipAddress: custData.ipAddress || req.ip || '127.0.0.1',
         deviceId: custData.deviceId || `DEV_${Date.now()}`,
         userAgent: custData.userAgent || req.headers['user-agent'] || '',

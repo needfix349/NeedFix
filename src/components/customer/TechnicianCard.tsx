@@ -53,16 +53,23 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleCallClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth('call this technician');
+      }
+      return;
+    }
+
     const custId = deviceSecurityService.getCustomerId();
-    const custName =
-      currentUser?.name ||
-      localStorage.getItem('needfix_customer_custom_name') ||
-      'Customer';
+    const custName = currentUser.name || 'Customer';
 
     storageService.logActivity({
       technicianId: technician.id,
       customerId: custId,
       customerName: custName,
+      customerPhone: currentUser.mobile,
       type: 'call',
       metadata: { phone: technician.mobile },
     });
@@ -73,16 +80,23 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
 
   const handleWhatsAppClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth('chat on WhatsApp with this technician');
+      }
+      return;
+    }
+
     const custId = deviceSecurityService.getCustomerId();
-    const custName =
-      currentUser?.name ||
-      localStorage.getItem('needfix_customer_custom_name') ||
-      'Customer';
+    const custName = currentUser.name || 'Customer';
 
     storageService.logActivity({
       technicianId: technician.id,
       customerId: custId,
       customerName: custName,
+      customerPhone: currentUser.mobile,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });

@@ -135,10 +135,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
   const [coverageRadiusKm, setCoverageRadiusKm] = useState(5); // Default 5 KM as per system specification
   const [businessDescription, setBusinessDescription] = useState('');
 
-  // 2. Multi-Trade / Skills Selection (Technician can select 2, 3, or more trades)
-  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([
-    SERVICE_CATEGORIES[0].id,
-  ]);
+  // 2. Multi-Trade / Skills Selection (Technician can select 1, 2, 3, or more trades)
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState<string[]>([]);
 
   // 3. Store / Company Photo / Logo (Gallery / Camera Upload)
   const [companyLogoUrl, setCompanyLogoUrl] = useState('');
@@ -339,10 +337,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
 
   const toggleCategory = (catId: string) => {
     if (selectedCategoryIds.includes(catId)) {
-      if (selectedCategoryIds.length === 1) {
-        setErrorMessage('Please select at least 1 service trade.');
-        return;
-      }
       setSelectedCategoryIds(selectedCategoryIds.filter((id) => id !== catId));
     } else {
       setSelectedCategoryIds([...selectedCategoryIds, catId]);

@@ -1116,17 +1116,40 @@ class StorageService {
   saveCustomer(customer: CustomerRecord): void {
     try {
       const list = this.getCustomers();
+      const cleanPhone = (customer.phone || customer.mobile_number || '').replace(/\D/g, '').slice(-10);
       const idx = list.findIndex(
-        (c) => c.customerId === customer.customerId || c.id === customer.id || (c.deviceId && c.deviceId === customer.deviceId)
+        (c) =>
+          c.customerId === customer.customerId ||
+          c.id === customer.id ||
+          (cleanPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === cleanPhone) ||
+          (cleanPhone && (c as any).mobile_number && (c as any).mobile_number.replace(/\D/g, '').slice(-10) === cleanPhone) ||
+          (c.deviceId && c.deviceId === customer.deviceId)
       );
       if (idx >= 0) {
+        const existing = list[idx];
+        const finalPhone = cleanPhone || existing.phone || (existing as any).mobile_number || '';
+        const finalName =
+          customer.name && customer.name !== 'NeedFix Visitor'
+            ? customer.name
+            : existing.name && existing.name !== 'NeedFix Visitor'
+            ? existing.name
+            : customer.name || 'NeedFix Customer';
+
         list[idx] = {
-          ...list[idx],
+          ...existing,
           ...customer,
+          name: finalName,
+          phone: finalPhone,
+          mobile_number: finalPhone,
           lastSeenAt: new Date().toISOString(),
         };
       } else {
-        list.unshift(customer);
+        const record = {
+          ...customer,
+          phone: cleanPhone || customer.phone || '',
+          mobile_number: cleanPhone || customer.mobile_number || '',
+        };
+        list.unshift(record);
       }
       localStorage.setItem(KEYS.CUSTOMERS, JSON.stringify(list.slice(0, 500)));
       this.notify();

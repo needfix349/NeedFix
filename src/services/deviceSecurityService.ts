@@ -846,8 +846,62 @@ class DeviceSecurityService {
       console.warn('API /api/customers fetch notice:', apiErr);
     }
 
-    // 2. Fetch from Supabase PostgreSQL users table (all registered customers)
+    // 2. Fetch from Supabase PostgreSQL customers table (all registered customers)
     if (isSupabaseConfigured()) {
+      try {
+        const { data: suCusts } = await supabase
+          .from('customers')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (suCusts && suCusts.length > 0) {
+          for (const sc of suCusts) {
+            const rawPhone = sc.mobile_number || sc.phone || '';
+            const cleanPhone = rawPhone.replace(/\D/g, '').slice(-10);
+
+            // Match in combined list
+            const existingIdx = combined.findIndex(
+              (c) =>
+                (c.id && c.id === sc.id) ||
+                (sc.device_id && c.deviceId === sc.device_id) ||
+                (cleanPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === cleanPhone) ||
+                (cleanPhone && (c as any).mobile_number && (c as any).mobile_number.replace(/\D/g, '').slice(-10) === cleanPhone)
+            );
+
+            if (existingIdx >= 0) {
+              combined[existingIdx] = {
+                ...combined[existingIdx],
+                name: sc.name || combined[existingIdx].name,
+                phone: cleanPhone || combined[existingIdx].phone || '',
+                mobile_number: cleanPhone || (combined[existingIdx] as any).mobile_number || '',
+                deviceId: sc.device_id || combined[existingIdx].deviceId,
+                isBlocked: Boolean(sc.is_blocked),
+                lastSeenAt: sc.last_seen_at || combined[existingIdx].lastSeenAt,
+                createdAt: sc.created_at || combined[existingIdx].createdAt,
+              };
+            } else {
+              combined.unshift({
+                id: sc.id,
+                customerId: `CUST-${cleanPhone ? cleanPhone.slice(-4) : combined.length + 1}`,
+                userId: sc.id,
+                name: sc.name || 'NeedFix Customer',
+                phone: cleanPhone,
+                mobile_number: cleanPhone,
+                ipAddress: '127.0.0.1',
+                deviceId: sc.device_id || 'DEV-CUSTOMER',
+                userAgent: '',
+                lastSeenAt: sc.last_seen_at || sc.created_at || new Date().toISOString(),
+                createdAt: sc.created_at || new Date().toISOString(),
+                isBlocked: Boolean(sc.is_blocked),
+              });
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Supabase getAllCustomers customers query exception:', err);
+      }
+
+      // Also check users table for any customer accounts
       try {
         const { data: suUsers } = await supabase
           .from('users')
@@ -855,11 +909,21 @@ class DeviceSecurityService {
           .eq('role', 'customer');
 
         if (suUsers && suUsers.length > 0) {
-          const existingIds = new Set(combined.map((c) => c.userId || c.id));
-          const existingNames = new Set(combined.map((c) => c.name.toLowerCase()));
-
           for (const u of suUsers) {
-            if (!existingIds.has(u.id) && !existingNames.has((u.name || '').toLowerCase())) {
+            const cleanPhone = (u.mobile || u.phone || '').replace(/\D/g, '').slice(-10);
+            const existingIdx = combined.findIndex(
+              (c) =>
+                (c.userId && c.userId === u.id) ||
+                (c.id && c.id === u.id) ||
+                (cleanPhone && c.phone && c.phone.replace(/\D/g, '').slice(-10) === cleanPhone)
+            );
+
+            if (existingIdx >= 0) {
+              if (cleanPhone && !combined[existingIdx].phone) {
+                combined[existingIdx].phone = cleanPhone;
+                combined[existingIdx].mobile_number = cleanPhone;
+              }
+            } else {
               let maxNum = 0;
               combined.forEach((c) => {
                 const m = c.customerId?.match(/CUST-(\d+)/i);
@@ -870,10 +934,11 @@ class DeviceSecurityService {
               });
               const newRec: CustomerRecord = {
                 id: `cust_${u.id}`,
-                customerId: `CUST-${maxNum + 1}`,
+                customerId: `CUST-${cleanPhone ? cleanPhone.slice(-4) : maxNum + 1}`,
                 userId: u.id,
                 name: u.name || 'NeedFix Customer',
-                phone: '',
+                phone: cleanPhone,
+                mobile_number: cleanPhone,
                 ipAddress: '127.0.0.1',
                 deviceId: u.installation_id || 'DEV-CUSTOMER',
                 userAgent: '',

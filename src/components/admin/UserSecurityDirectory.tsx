@@ -546,9 +546,9 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
                       <td className="py-3 px-4">
                         <div className="font-bold text-slate-900">{cust.name}</div>
                         <div className="text-[11px] text-slate-500 font-mono">
-                          {cust.phone ? (
-                            <span className="flex items-center gap-1">
-                              <Phone size={10} /> {cust.phone}
+                          {(cust.phone || (cust as any).mobile_number) ? (
+                            <span className="flex items-center gap-1 font-semibold text-slate-700">
+                              <Phone size={10} className="text-blue-600" /> {cust.phone || (cust as any).mobile_number}
                             </span>
                           ) : (
                             <span className="text-slate-400 italic">Web Visitor (No phone yet)</span>
@@ -596,21 +596,21 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
                       {/* Action Button */}
                       <td className="py-3 px-4 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
-                          {cust.phone && (
+                          {(cust.phone || (cust as any).mobile_number) && (
                             <>
                               <a
-                                href={`tel:${cust.phone.startsWith('+') ? cust.phone : '+91' + cust.phone.replace(/\D/g, '').slice(-10)}`}
+                                href={`tel:${(cust.phone || (cust as any).mobile_number).startsWith('+') ? (cust.phone || (cust as any).mobile_number) : '+91' + (cust.phone || (cust as any).mobile_number).replace(/\D/g, '').slice(-10)}`}
                                 className="p-1.5 bg-blue-50 hover:bg-blue-600 text-blue-600 hover:text-white border border-blue-200 rounded-lg transition-colors cursor-pointer"
-                                title={`Call ${cust.name} (${cust.phone})`}
+                                title={`Call ${cust.name} (${cust.phone || (cust as any).mobile_number})`}
                               >
                                 <Phone size={12} />
                               </a>
                               <a
-                                href={`https://wa.me/91${cust.phone.replace(/\D/g, '').slice(-10)}`}
+                                href={`https://wa.me/91${(cust.phone || (cust as any).mobile_number).replace(/\D/g, '').slice(-10)}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="p-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border border-emerald-200 rounded-lg transition-colors cursor-pointer"
-                                title={`WhatsApp ${cust.name} (${cust.phone})`}
+                                title={`WhatsApp ${cust.name} (${cust.phone || (cust as any).mobile_number})`}
                               >
                                 <MessageSquare size={12} />
                               </a>
@@ -635,7 +635,7 @@ export const UserSecurityDirectory: React.FC<UserSecurityDirectoryProps> = ({
                                   targetId: cust.id,
                                   uniqueId: cust.customerId,
                                   name: cust.name,
-                                  phone: cust.phone,
+                                  phone: cust.phone || (cust as any).mobile_number,
                                   ipAddress: cust.ipAddress,
                                   deviceId: cust.deviceId,
                                 })

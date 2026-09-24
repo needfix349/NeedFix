@@ -87,11 +87,20 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleCall = () => {
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth('call this technician');
+      }
+      return;
+    }
+
     const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
       customerId: cust.customerId,
       customerName: cust.customerName,
+      customerPhone: currentUser.mobile,
       type: 'call',
       metadata: { phone: technician.mobile },
     });
@@ -100,11 +109,20 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleCallForService = (serviceName: string) => {
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth(`call this technician for ${serviceName}`);
+      }
+      return;
+    }
+
     const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
       customerId: cust.customerId,
       customerName: cust.customerName,
+      customerPhone: currentUser.mobile,
       type: 'call',
       metadata: { phone: technician.mobile, service: serviceName },
     });
@@ -113,11 +131,20 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsApp = () => {
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth('chat on WhatsApp with this technician');
+      }
+      return;
+    }
+
     const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
       customerId: cust.customerId,
       customerName: cust.customerName,
+      customerPhone: currentUser.mobile,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile },
     });
@@ -131,11 +158,20 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
   };
 
   const handleWhatsAppForService = (serviceName: string) => {
+    // Check if customer is authenticated
+    if (!currentUser || currentUser.id === 'guest' || !currentUser.mobile) {
+      if (onRequireAuth) {
+        onRequireAuth(`chat on WhatsApp for ${serviceName}`);
+      }
+      return;
+    }
+
     const cust = getCustomerInfo();
     storageService.logActivity({
       technicianId: technician.id,
       customerId: cust.customerId,
       customerName: cust.customerName,
+      customerPhone: currentUser.mobile,
       type: 'whatsapp',
       metadata: { whatsapp: technician.whatsappNumber || technician.mobile, service: serviceName },
     });
