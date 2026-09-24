@@ -6,6 +6,7 @@ import { AdminPanel } from './components/admin/AdminPanel';
 import { UnifiedAuthModal } from './components/auth/UnifiedAuthModal';
 import { OnboardingModal } from './components/auth/OnboardingModal';
 import { TechnicianRegistrationModal } from './components/technician/TechnicianRegistrationModal';
+import { TechnicianPortalModal } from './components/technician/TechnicianPortalModal';
 import { TechnicianDetailModal } from './components/customer/TechnicianDetailModal';
 import { ImportantNoticeModal } from './components/auth/ImportantNoticeModal';
 import { SMSNotificationToast } from './components/common/SMSNotificationToast';
@@ -52,6 +53,7 @@ export default function App() {
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [showImportantNoticeModal, setShowImportantNoticeModal] = useState<boolean>(false);
   const [showTechRegistrationModal, setShowTechRegistrationModal] = useState(false);
+  const [showTechPortalModal, setShowTechPortalModal] = useState(false);
   const [selectedTechnician, setSelectedTechnician] = useState<TechnicianProfile | null>(null);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<DeviceSecurityStatus | null>(null);
@@ -59,10 +61,30 @@ export default function App() {
   // Device Security Verification: Check if device or user is blocked
   const runDeviceSecurityVerification = async () => {
     try {
-      const status = await deviceSecurityService.checkDeviceBlocked();
+      const activeUser = storageService.getCurrentUser();
+      const techProfile = activeUser
+        ? storageService
+            .getTechnicians()
+            .find(
+              (t) =>
+                t.userId === activeUser.id ||
+                t.id === activeUser.id ||
+                (activeUser.technicianId && t.id === activeUser.technicianId) ||
+                (activeUser.mobile && (t.mobile === activeUser.mobile || t.whatsappNumber === activeUser.mobile))
+            )
+        : undefined;
+
+      const status = await deviceSecurityService.checkDeviceBlocked({
+        userId: activeUser?.id,
+        mobile: activeUser?.mobile || techProfile?.mobile,
+        username: activeUser?.username || techProfile?.technicianCode,
+        role: activeUser?.role,
+        technicianId: techProfile?.id || activeUser?.technicianId,
+        customerId: activeUser?.id,
+      });
       setSecurityStatus(status);
       if (status.isBlocked) {
-        storageService.clearSession();
+        storageService.clearSession(true);
         setCurrentUser(null);
       }
     } catch {}
@@ -73,6 +95,7 @@ export default function App() {
     activeView,
     selectedTechnician,
     showTechRegistrationModal,
+    showTechPortalModal,
     showAuthModal,
     showHelpModal,
     showImportantNoticeModal,
@@ -83,6 +106,7 @@ export default function App() {
       activeView,
       selectedTechnician,
       showTechRegistrationModal,
+      showTechPortalModal,
       showAuthModal,
       showHelpModal,
       showImportantNoticeModal,
@@ -107,6 +131,10 @@ export default function App() {
     }
     if (s.showTechRegistrationModal) {
       setShowTechRegistrationModal(false);
+      return true;
+    }
+    if (s.showTechPortalModal) {
+      setShowTechPortalModal(false);
       return true;
     }
     if (s.showAuthModal) {
@@ -140,11 +168,12 @@ export default function App() {
 
   // Navigation router with history support
   const handleNavigateToView = (view: 'home' | 'technician_dashboard' | 'admin_panel') => {
-    if (view === 'technician_dashboard' && !currentUser) {
-      setAuthInitialRole('technician');
-      pushNavHistory('auth');
-      setShowAuthModal(true);
-      return;
+    if (view === 'technician_dashboard') {
+      const activeUser = storageService.getCurrentUser();
+      if (!activeUser || activeUser.role !== 'technician') {
+        handleOpenTechnicianPortal();
+        return;
+      }
     }
     if (view !== 'home' && activeView === 'home') {
       pushNavHistory(`view_${view}`);
@@ -158,12 +187,13 @@ export default function App() {
   };
 
   const handleOpenTechnicianRegistration = () => {
-    if (!currentUser) {
-      handleRequireAuth('register as a service provider', 'technician');
-    } else {
-      pushNavHistory('tech_registration');
-      setShowTechRegistrationModal(true);
-    }
+    pushNavHistory('tech_registration');
+    setShowTechRegistrationModal(true);
+  };
+
+  const handleOpenTechnicianPortal = () => {
+    pushNavHistory('tech_portal');
+    setShowTechPortalModal(true);
   };
 
   const handleOpenHelpSupport = () => {
@@ -176,15 +206,13 @@ export default function App() {
     setShowImportantNoticeModal(true);
   };
 
-  const handleRequireAuth = (actionDescription?: string, role: 'customer' | 'technician' = 'customer') => {
-    if (role === 'technician') {
-      setAuthPromptMessage('Technician verification is required to register and manage service provider profiles.');
-    } else if (actionDescription) {
-      setAuthPromptMessage(`To ${actionDescription}, please enter your details.`);
+  const handleRequireAuth = (actionDescription?: string) => {
+    if (actionDescription) {
+      setAuthPromptMessage(`To ${actionDescription}, please sign in with your mobile number.`);
     } else {
-      setAuthPromptMessage('Please enter your details to contact technicians.');
+      setAuthPromptMessage('Please sign in with your mobile number to contact technicians.');
     }
-    setAuthInitialRole(role);
+    setAuthInitialRole('customer');
     pushNavHistory('auth');
     setShowAuthModal(true);
   };
@@ -229,6 +257,12 @@ export default function App() {
       closeActiveModalOrView();
     };
     window.addEventListener('popstate', onPopState);
+
+    // Immediate security lock listener
+    const onSecurityBlock = () => {
+      runDeviceSecurityVerification();
+    };
+    window.addEventListener('needfix_security_block', onSecurityBlock);
 
     // Show Important Notice modal after 5 seconds of entering (if not already agreed)
     const noticeTimer = setTimeout(() => {
@@ -378,6 +412,10 @@ export default function App() {
   // Technician Registration submitted
   const handleTechnicianSubmitted = (newProfile: TechnicianProfile) => {
     setTechnicians(storageService.getTechnicians());
+    const active = storageService.getCurrentUser();
+    if (active) {
+      setCurrentUser(active);
+    }
     setActiveView('technician_dashboard');
   };
 
@@ -439,6 +477,7 @@ export default function App() {
           setShowAuthModal(true);
         }}
         onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
+        onOpenTechnicianPortal={handleOpenTechnicianPortal}
         onOpenHelpSupport={handleOpenHelpSupport}
         onLogout={handleLogout}
         onUpdateCity={handleUpdateCity}
@@ -456,7 +495,7 @@ export default function App() {
             favorites={favorites}
             onToggleFavorite={handleToggleFavorite}
             onSelectTechnician={handleSelectTechnician}
-            onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
+            onOpenTechnicianRegistration={handleOpenTechnicianPortal}
             onUpdateLocation={handleUpdateLocation}
             onRequireAuth={handleRequireAuth}
           />
@@ -484,10 +523,11 @@ export default function App() {
         onOpenNoticeModal={handleOpenNoticeModal}
         onOpenAdmin={() => handleNavigateToView('admin_panel')}
         onOpenTechnicianRegistration={handleOpenTechnicianRegistration}
+        onOpenTechnicianPortal={handleOpenTechnicianPortal}
       />
 
       {/* MODALS */}
-      {/* 1. Unified Mobile OTP Login Modal */}
+      {/* 1. Customer Sign In & Registration Modal */}
       {showAuthModal && (
         <UnifiedAuthModal
           isOpen={showAuthModal}
@@ -495,11 +535,26 @@ export default function App() {
           onSuccess={handleAuthSuccess}
           onLoginSuccess={handleAuthSuccess}
           promptMessage={authPromptMessage}
-          initialRole={authInitialRole}
         />
       )}
 
-      {/* 2. User Profile & Location Onboarding Modal */}
+      {/* 2. Independent Technician / Partner Portal Modal */}
+      {showTechPortalModal && (
+        <TechnicianPortalModal
+          isOpen={showTechPortalModal}
+          onClose={handleGoBack}
+          onLoginSuccess={(user, technician) => {
+            setCurrentUser(user);
+            setTechnicians(storageService.getTechnicians());
+            setActiveView('technician_dashboard');
+          }}
+          onOpenRegistration={() => {
+            handleOpenTechnicianRegistration();
+          }}
+        />
+      )}
+
+      {/* 3. User Profile & Location Onboarding Modal */}
       {showOnboardingModal && currentUser && (
         <OnboardingModal
           user={currentUser}
@@ -508,7 +563,7 @@ export default function App() {
       )}
 
       {/* 3. Become a Service Provider (Technician Registration) Form */}
-      {showTechRegistrationModal && currentUser && (
+      {showTechRegistrationModal && (
         <TechnicianRegistrationModal
           isOpen={showTechRegistrationModal}
           onClose={handleGoBack}

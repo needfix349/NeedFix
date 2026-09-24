@@ -207,7 +207,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                   </span>
                   <h3 className="text-sm font-bold leading-snug">Need a Technician in {currentLocation.city}?</h3>
                   <p className="text-[11px] text-blue-100/80 leading-tight">
-                    Direct phone & WhatsApp booking without commission fees.
+                    Direct phone & WhatsApp booking with verified local experts.
                   </p>
                 </div>
                 <div className="absolute -bottom-2 -right-2 text-5xl opacity-30 select-none">
@@ -464,7 +464,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                       <CategoryLogo categoryId={c.id} size="sm" />
                       <div className="truncate">
                         <p className="text-xs font-bold text-slate-900 truncate">{c.name}</p>
-                        <p className="text-[10px] text-slate-500 truncate">{c.hindiName || 'Verified Experts'}</p>
+                        <p className="text-[10px] text-slate-500 truncate">{c.description || 'Verified Experts'}</p>
                       </div>
                     </button>
                   ))}
@@ -503,7 +503,7 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                   className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-blue-200/60"
                 >
                   <User size={14} />
-                  <span>Edit Name / Profile (नाम बदलें / दर्ज करें)</span>
+                  <span>Edit Name & Profile</span>
                 </button>
               </div>
 

@@ -5,7 +5,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'ac-technician',
     name: 'AC Technician & Gas Refill',
-    hindiName: 'एसी तकनीशियन एवं गैस रीफिल',
     icon: '❄️',
     lucideIconName: 'Fan',
     description: 'AC Installation, gas refilling (R32/R410A), cooling repair, deep servicing & maintenance',
@@ -16,7 +15,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'electrician',
     name: 'Electrician & Wiring',
-    hindiName: 'इलेक्ट्रीशियन एवं वायरिंग',
     icon: '⚡',
     lucideIconName: 'Zap',
     description: 'Switchboard wiring, short circuit fixes, fan repair, inverter setup & light fitting',
@@ -27,7 +25,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'cctv-security',
     name: 'CCTV & Security Installer',
-    hindiName: 'सीसीटीवी एवं सुरक्षा इंस्टॉलर',
     icon: '📹',
     lucideIconName: 'Camera',
     description: 'HD/IP Camera installation, DVR/NVR setup, video door bells & biometric systems',
@@ -37,7 +34,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'plumber',
     name: 'Plumber & Water Motor',
-    hindiName: 'प्लंबर एवं वाटर मोटर',
     icon: '🔧',
     lucideIconName: 'Wrench',
     description: 'Pipe leakage repair, tap fixing, water motor pump, drain unclogging & sanitary setup',
@@ -48,7 +44,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'home-appliance',
     name: 'Home Appliance Repair',
-    hindiName: 'घरेलू उपकरण मरम्मत',
     icon: '🧺',
     lucideIconName: 'Tv',
     description: 'Washing machine, refrigerator, microwave oven, geyser & chimney repair',
@@ -58,7 +53,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'taxi-cab-service',
     name: 'Taxi Driver & Cab',
-    hindiName: 'टैक्सी ड्राइवर एवं कैब',
     icon: '🚖',
     lucideIconName: 'Car',
     description: 'Local city rides, outstation cabs, airport pick & drop, 24/7 emergency vehicle booking',
@@ -69,7 +63,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'tile-marble-layer',
     name: 'Tile & Marble Layer',
-    hindiName: 'टाइल एवं मार्बल लेयर',
     icon: '🧱',
     lucideIconName: 'Layers',
     description: 'Vitrified tiles, Italian marble flooring, bathroom tiling, granite polishing & grouting',
@@ -79,7 +72,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'interior-designer',
     name: 'Interior Designer',
-    hindiName: 'इंटीरियर डिजाइनर',
     icon: '🛋️',
     lucideIconName: 'Sparkles',
     description: '3D modular kitchen, wardrobe design, living room revamp, space planning & consultation',
@@ -90,7 +82,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'aluminum-fabricator',
     name: 'Aluminum Fabricator',
-    hindiName: 'एल्युमिनियम फैब्रिकेटर',
     icon: '🪟',
     lucideIconName: 'Hammer',
     description: 'Aluminum sliding windows, office partitions, mosquito mesh, doors & ACP sheet work',
@@ -100,7 +91,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'glass-technician',
     name: 'Glass Technician',
-    hindiName: 'ग्लास तकनीशियन',
     icon: '🪞',
     lucideIconName: 'Maximize2',
     description: 'Toughened glass partitions, shower cubicles, mirror beveling, spider fittings & railing',
@@ -110,7 +100,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'painter',
     name: 'Painter',
-    hindiName: 'पेंटर',
     icon: '🎨',
     lucideIconName: 'Paintbrush',
     description: 'Interior & exterior painting, texture wall art, waterproofing, wood polish & putty work',
@@ -120,7 +109,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'mehndi-artist',
     name: 'Mehndi Artist',
-    hindiName: 'मेहंदी आर्टिस्ट',
     icon: '🌿',
     lucideIconName: 'Flower2',
     description: 'Bridal mehndi, Arabic henna designs, engagement, festival & guest party packages',
@@ -130,7 +118,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'makeup-artist',
     name: 'Makeup Artist',
-    hindiName: 'मेकअप आर्टिस्ट',
     icon: '💄',
     lucideIconName: 'Sparkles',
     description: 'HD Bridal makeup, party look, hairstyling, saree draping & airbrush makeover',
@@ -141,7 +128,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'event-decorator',
     name: 'Marriage Hall / Event Decorator',
-    hindiName: 'मैरिज हॉल / इवेंट डेकोरेटर',
     icon: '🎪',
     lucideIconName: 'PartyPopper',
     description: 'Wedding stage setup, flower decoration, entry gate arches, lighting & mandap themes',
@@ -151,7 +137,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'wallpaper-panel-installer',
     name: 'Wallpaper & Panel Installer',
-    hindiName: 'वॉलपेपर एवं पैनल इंस्टॉलर',
     icon: '📜',
     lucideIconName: 'Wallpaper',
     description: '3D luxury wallpapers, PVC wall panels, fluted charcoal louvers, acoustic padding',
@@ -161,7 +146,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'false-ceiling-contractor',
     name: 'False Ceiling Contractor',
-    hindiName: 'फॉल्स सीलिंग ठेकेदार',
     icon: '🏛️',
     lucideIconName: 'Building',
     description: 'Gypsum board ceiling, POP cove design, grid ceiling, wooden rafters & LED profile channels',
@@ -171,7 +155,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'key-lock-maker',
     name: 'Key Lock Maker',
-    hindiName: 'चाबी एवं ताला बनाने वाले',
     icon: '🔑',
     lucideIconName: 'Key',
     description: 'Emergency door lock opening, duplicate computerized keys, smart digital lock fixing',
@@ -182,7 +165,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'inverter-battery-mechanic',
     name: 'Inverter & Battery Mechanic',
-    hindiName: 'इन्वर्टर एवं बैटरी मैकेनिक',
     icon: '🔋',
     lucideIconName: 'BatteryCharging',
     description: 'Home inverter repair, tubular battery water top-up, backup load test & solar inverter setup',
@@ -193,7 +175,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'carpenter-woodwork',
     name: 'Carpenter & Woodwork',
-    hindiName: 'बढ़ई एवं लकड़ी का काम',
     icon: '🪚',
     lucideIconName: 'Hammer',
     description: 'Furniture repair, door latch & hinge fixing, modular wardrobe assembly, drawer channels & polish',
@@ -204,7 +185,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'doorstep-bike-repair',
     name: 'Doorstep Bike Repair',
-    hindiName: 'डोरस्टेप बाइक रिपेयर',
     icon: '🏍️',
     lucideIconName: 'Bike',
     description: 'Two-wheeler doorstep servicing, engine oil change, puncture fix, brake adjustment & breakdown assistance',
@@ -215,7 +195,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'home-tuition',
     name: 'Home Tuition / Personal Tutor',
-    hindiName: 'होम ट्यूशन / पर्सनल ट्यूटर',
     icon: '📚',
     lucideIconName: 'GraduationCap',
     description: 'Class 1-12 all subjects, CBSE/ICSE, competitive exams, spoken English & 1-on-1 home tutors',
@@ -232,7 +211,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'goods-transport',
     name: 'Goods Transport / Pickup (Chota Hathi)',
-    hindiName: 'गुड्स ट्रांसपोर्ट / पिकअप (छोटा हाथी)',
     icon: '🚚',
     lucideIconName: 'Truck',
     description: 'Tata Ace (Chota Hathi), pickup vans, house shifting, commercial cargo & intra-city logistics',
@@ -249,7 +227,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'cleaner-maid',
     name: 'Cleaner / Maid',
-    hindiName: 'सफाई कर्मचारी / मेड',
     icon: '🧹',
     lucideIconName: 'Sparkles',
     description: 'Full house deep cleaning, daily maid, bathroom sanitization, kitchen degreasing & housekeeping',
@@ -266,7 +243,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'babysitter-nurse',
     name: 'Babysitter / Nurse',
-    hindiName: 'बेबीसिटर / नर्स (केयरटेकर)',
     icon: '👶',
     lucideIconName: 'HeartHandshake',
     description: 'Certified infant care, professional babysitters, elderly patient nursing, day & night nanny assistance',
@@ -283,7 +259,6 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
   {
     id: 'packers-movers-helper',
     name: 'Packers & Movers Helper',
-    hindiName: 'पैकर्स एवं मूवर्स हेल्पर',
     icon: '📦',
     lucideIconName: 'Package',
     description: 'Household luggage packing, loading & unloading helpers, carton bubble wrapping, shifting manpower',

@@ -87,7 +87,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-sky-400 via-blue-500 to-indigo-600',
         'border border-sky-300/60',
         'shadow-sky-500/25',
-        'AC Technician & Cooling (एसी रिपेयर)',
+        'AC Technician & Cooling',
         AcTechnician3DIcon
       );
 
@@ -97,7 +97,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-400 via-yellow-500 to-orange-500',
         'border border-amber-300/60',
         'shadow-amber-500/25',
-        'Electrician & Wiring (इलेक्ट्रीशियन)',
+        'Electrician & Wiring',
         Electrician3DIcon
       );
 
@@ -108,7 +108,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-slate-700 via-slate-900 to-indigo-950',
         'border border-slate-600/60',
         'shadow-slate-800/30',
-        'CCTV & Security Camera (सीसीटीवी कैमरा)',
+        'CCTV & Security Camera',
         Cctv3DIcon
       );
 
@@ -118,7 +118,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-cyan-400 via-blue-600 to-teal-700',
         'border border-cyan-300/60',
         'shadow-cyan-500/25',
-        'Plumber & Water Motor (प्लंबर एवं वाटर मोटर)',
+        'Plumber & Water Motor',
         Plumber3DIcon
       );
 
@@ -129,7 +129,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-indigo-500 via-purple-600 to-slate-900',
         'border border-indigo-400/60',
         'shadow-indigo-500/25',
-        'Home Appliance Repair (वाशिंग मशीन / फ्रिज)',
+        'Home Appliance Repair',
         HomeAppliance3DIcon
       );
 
@@ -141,7 +141,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-400 via-yellow-400 to-amber-500',
         'border border-amber-300/80',
         'shadow-amber-500/30',
-        'Taxi Driver & Cab Service (टैक्सी एवं कैब)',
+        'Taxi Driver & Cab Service',
         TaxiCab3DIcon
       );
 
@@ -153,7 +153,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-teal-500 via-emerald-600 to-slate-800',
         'border border-teal-400/60',
         'shadow-teal-500/25',
-        'Tile & Marble Layer (टाइल एवं मार्बल)',
+        'Tile & Marble Layer',
         TileMarble3DIcon
       );
 
@@ -164,7 +164,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-rose-500 via-pink-600 to-purple-800',
         'border border-rose-400/60',
         'shadow-rose-500/25',
-        'Interior Designer (इंटीरियर डिजाइनर)',
+        'Interior Designer',
         InteriorDesigner3DIcon
       );
 
@@ -175,7 +175,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-slate-500 via-slate-600 to-zinc-800',
         'border border-slate-400/60',
         'shadow-slate-600/25',
-        'Aluminum Fabricator (एल्युमिनियम फैब्रिकेटर)',
+        'Aluminum Fabricator',
         AluminumFabricator3DIcon
       );
 
@@ -186,7 +186,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-sky-400 via-teal-400 to-blue-600',
         'border border-sky-300/60',
         'shadow-sky-500/25',
-        'Glass Technician (ग्लास एवं टफन्ड ग्लास)',
+        'Glass Technician',
         GlassTechnician3DIcon
       );
 
@@ -196,7 +196,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-fuchsia-500 via-purple-600 to-indigo-700',
         'border border-purple-400/60',
         'shadow-purple-500/25',
-        'Painter & Wall Decor (पेंटर)',
+        'Painter & Wall Decor',
         Painter3DIcon
       );
 
@@ -207,7 +207,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-emerald-500 via-green-600 to-teal-800',
         'border border-emerald-400/60',
         'shadow-emerald-600/25',
-        'Mehndi Artist (मेहंदी आर्टिस्ट)',
+        'Mehndi Artist',
         MehndiArtist3DIcon
       );
 
@@ -218,7 +218,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-pink-400 via-rose-500 to-red-600',
         'border border-pink-300/60',
         'shadow-pink-500/25',
-        'Makeup Artist & Beautician (मेकअप आर्टिस्ट)',
+        'Makeup Artist & Beautician',
         MakeupArtist3DIcon
       );
 
@@ -229,7 +229,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-orange-400 via-rose-500 to-purple-600',
         'border border-orange-300/60',
         'shadow-orange-500/25',
-        'Event Decorator & Marriage Hall (इवेंट डेकोरेटर)',
+        'Event Decorator & Marriage Hall',
         EventDecorator3DIcon
       );
 
@@ -240,7 +240,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-500 via-yellow-600 to-stone-800',
         'border border-amber-400/60',
         'shadow-amber-500/25',
-        'Wallpaper & Panel Installer (वॉलपेपर एवं पैनल)',
+        'Wallpaper & Panel Installer',
         WallpaperPanel3DIcon
       );
 
@@ -251,7 +251,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-500 via-slate-800 to-zinc-950',
         'border border-amber-400/60',
         'shadow-slate-700/25',
-        'False Ceiling Contractor (फॉल्स सीलिंग)',
+        'False Ceiling Contractor',
         FalseCeiling3DIcon
       );
 
@@ -262,7 +262,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-400 via-yellow-500 to-amber-700',
         'border border-amber-300/60',
         'shadow-amber-500/25',
-        'Key Lock Maker (चाबी एवं ताला बनाने वाले)',
+        'Key Lock Maker',
         KeyLockMaker3DIcon
       );
 
@@ -273,7 +273,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-red-500 via-orange-600 to-slate-900',
         'border border-red-400/60',
         'shadow-red-600/25',
-        'Inverter & Battery Mechanic (इन्वर्टर एवं बैटरी)',
+        'Inverter & Battery Mechanic',
         InverterBattery3DIcon
       );
 
@@ -284,7 +284,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-700 via-amber-800 to-stone-900',
         'border border-amber-600/60',
         'shadow-amber-800/25',
-        'Carpenter & Woodwork (बढ़ई / फर्नीचर)',
+        'Carpenter & Woodwork',
         Carpenter3DIcon
       );
 
@@ -295,7 +295,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-red-500 via-rose-600 to-zinc-900',
         'border border-red-400/60',
         'shadow-red-500/25',
-        'Doorstep Bike Repair (डोरस्टेप बाइक रिपेयर)',
+        'Doorstep Bike Repair',
         BikeRepair3DIcon
       );
 
@@ -306,7 +306,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-blue-500 via-indigo-600 to-slate-900',
         'border border-blue-400/60',
         'shadow-blue-500/25',
-        'Home Tuition / Personal Tutor (होम ट्यूशन)',
+        'Home Tuition & Personal Tutor',
         HomeTuition3DIcon
       );
 
@@ -318,7 +318,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-cyan-500 via-teal-600 to-blue-900',
         'border border-cyan-400/60',
         'shadow-cyan-600/25',
-        'Goods Transport / Pickup Chota Hathi (गुड्स ट्रांसपोर्ट)',
+        'Goods Transport & Logistics',
         GoodsTransport3DIcon
       );
 
@@ -330,7 +330,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-teal-400 via-cyan-500 to-blue-600',
         'border border-teal-300/60',
         'shadow-teal-500/25',
-        'Cleaner / Maid (सफाई कर्मचारी / मेड)',
+        'Cleaner & Maid Service',
         CleanerMaid3DIcon
       );
 
@@ -342,7 +342,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-rose-400 via-pink-500 to-rose-600',
         'border border-rose-300/60',
         'shadow-rose-500/25',
-        'Babysitter / Nurse Caretaker (बेबीसिटर / नर्स)',
+        'Babysitter & Caretaker',
         BabysitterNurse3DIcon
       );
 
@@ -355,7 +355,7 @@ export const CategoryLogo: React.FC<CategoryLogoProps> = ({
         'from-amber-600 via-yellow-700 to-stone-800',
         'border border-amber-500/60',
         'shadow-amber-600/25',
-        'Packers & Movers Helper (पैकर्स एवं मूवर्स हेल्पर)',
+        'Packers & Movers Helper',
         PackersMoversHelper3DIcon
       );
 

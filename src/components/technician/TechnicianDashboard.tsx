@@ -1026,7 +1026,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                      Work Catalog (काम की लिस्ट)
+                      Work Catalog
                     </label>
                     <p className="text-[11px] text-slate-500">
                       Mention the work name, details, and upload photos of your past work.
@@ -1116,7 +1116,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                 <div className="p-4 bg-blue-50/60 rounded-2xl border border-blue-200/80 space-y-3">
                   <div className="flex items-center gap-1.5 text-blue-900 font-bold text-xs">
                     <Plus size={15} className="text-blue-600" />
-                    <span>Add New Work Service (नया काम और फोटो जोड़ें)</span>
+                    <span>Add New Work Service</span>
                   </div>
 
                   <div>
@@ -1148,7 +1148,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                   {/* Work Photo Upload */}
                   <div>
                     <label className="block text-[11px] font-semibold text-slate-700 mb-1.5">
-                      Work Photo (काम का फोटो अपलोड करें)
+                      Work Photo
                     </label>
                     <div className="flex flex-wrap items-center gap-3">
                       {newServicePhotoUrl ? (
@@ -1190,7 +1190,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                       </button>
 
                       <span className="text-[11px] text-slate-500">
-                        {newServiceFileName ? `📁 ${newServiceFileName}` : '(Gallery या Camera से फोटो लें)'}
+                        {newServiceFileName ? `📁 ${newServiceFileName}` : '(Select from Gallery or Camera)'}
                       </span>
                     </div>
                   </div>
@@ -1203,7 +1203,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
                       className="py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                     >
                       <Plus size={14} />
-                      <span>Add to Service Menu (काम जोड़ें)</span>
+                      <span>Add to Service Menu</span>
                     </button>
                   </div>
                 </div>

@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS public.technicians (
     full_name TEXT NOT NULL,
     company_name TEXT,
     mobile TEXT NOT NULL,
+    pin TEXT DEFAULT '0000',               -- 4-Digit Secret PIN for technician portal authentication
     whatsapp_number TEXT,
     category_id TEXT,
     category_name TEXT,
@@ -77,9 +78,13 @@ CREATE TABLE IF NOT EXISTS public.technicians (
     applied_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Indexes for fast lookup by Unique ID, Phone, Aadhaar, IP, and Device
+-- Ensure pin column exists on existing table instances
+ALTER TABLE public.technicians ADD COLUMN IF NOT EXISTS pin TEXT DEFAULT '0000';
+
+-- Indexes for fast lookup by Unique ID, Phone, PIN, Aadhaar, IP, and Device
 CREATE INDEX IF NOT EXISTS idx_technicians_code ON public.technicians(technician_code);
 CREATE INDEX IF NOT EXISTS idx_technicians_mobile ON public.technicians(mobile);
+CREATE INDEX IF NOT EXISTS idx_technicians_pin ON public.technicians(pin);
 CREATE INDEX IF NOT EXISTS idx_technicians_device_id ON public.technicians(device_id);
 CREATE INDEX IF NOT EXISTS idx_technicians_ip_address ON public.technicians(ip_address);
 CREATE INDEX IF NOT EXISTS idx_technicians_is_blocked ON public.technicians(is_blocked);

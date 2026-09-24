@@ -33,7 +33,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
   onClose,
   currentLocation,
   onSelectLocation,
-  title = 'Select Location (लोकेशन सेट करें)',
+  title = 'Select Location',
   subtitle = 'Choose State, District or use Automatic GPS',
 }) => {
   const [tempLocation, setTempLocation] = useState<UserLocation>(
@@ -280,7 +280,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
             <div className="flex items-center justify-between">
               <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                 <Navigation size={13} className="text-blue-600" />
-                <span>3. Automatic GPS Tracker (ऑटोमेटिक GPS लोकेशन)</span>
+                <span>3. Automatic GPS Tracker</span>
               </span>
               {gpsStatus === 'locked' && (
                 <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
@@ -298,12 +298,12 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
               {isLocatingGPS ? (
                 <>
                   <RefreshCw size={16} className="animate-spin" />
-                  <span>Locating via GPS... (GPS डिटेक्ट हो रहा है)</span>
+                  <span>Locating via GPS...</span>
                 </>
               ) : (
                 <>
                   <Navigation size={16} className="fill-white" />
-                  <span>Detect My Current GPS Location (ऑटो GPS ऑन करें)</span>
+                  <span>Detect My Current GPS Location</span>
                 </>
               )}
             </button>
@@ -321,14 +321,14 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
           <div className="relative flex items-center justify-center my-1">
             <div className="border-t border-slate-200 w-full" />
             <span className="bg-white px-3 text-[11px] font-bold text-slate-400 shrink-0 uppercase tracking-wider">
-              या फिर खुद चुनें (Or Select Manually)
+              Or Select Manually
             </span>
           </div>
 
           {/* OPTION 1: State Select Dropdown */}
           <div className="space-y-1.5">
             <label htmlFor="state-select-input" className="block text-xs font-bold text-slate-800">
-              1. State Select (राज्य चुनें) <span className="text-red-500">*</span>
+              1. State Select <span className="text-red-500">*</span>
             </label>
             <div className="relative">
               <select
@@ -337,17 +337,17 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
                 onChange={(e) => handleStateChange(e.target.value)}
                 className="w-full bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-300 focus:border-blue-600 focus:ring-2 focus:ring-blue-100 rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-800 appearance-none cursor-pointer pr-10 shadow-2xs transition-colors"
               >
-                <optgroup label="States (28 राज्य)">
+                <optgroup label="States (28 States)">
                   {ALL_INDIAN_STATES.map((st) => (
                     <option key={st.id} value={st.name}>
-                      {st.name} ({st.hindiName})
+                      {st.name}
                     </option>
                   ))}
                 </optgroup>
-                <optgroup label="Union Territories (8 केंद्र शासित प्रदेश)">
+                <optgroup label="Union Territories (8 Union Territories)">
                   {UNION_TERRITORIES.map((ut) => (
                     <option key={ut.id} value={ut.name}>
-                      {ut.name} ({ut.hindiName})
+                      {ut.name}
                     </option>
                   ))}
                 </optgroup>
@@ -361,7 +361,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
           {/* OPTION 2: District / City Select Dropdown */}
           <div className="space-y-1.5">
             <label htmlFor="district-select-input" className="block text-xs font-bold text-slate-800 flex items-center justify-between">
-              <span>2. District / City Select (ज़िला / शहर चुनें) <span className="text-red-500">*</span></span>
+              <span>2. District / City Select <span className="text-red-500">*</span></span>
               <span className="text-[10px] font-semibold text-blue-600">
                 {currentStateDistricts.length} districts in {selectedStateObj?.name}
               </span>
@@ -375,7 +375,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
               >
                 {currentStateDistricts.map((dist) => (
                   <option key={dist.id} value={dist.id}>
-                    {dist.name} ({dist.hindiName}) {dist.isMajorCity ? '★ Hub' : ''}
+                    {dist.name} {dist.isMajorCity ? '★ Hub' : ''}
                   </option>
                 ))}
               </select>
@@ -393,7 +393,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
               </div>
               <div className="min-w-0">
                 <span className="text-[10px] font-bold uppercase tracking-wider text-blue-700 block">
-                  Current Selection (चुनी गई लोकेशन)
+                  Current Selection
                 </span>
                 <span className="text-xs font-bold text-slate-900 block truncate">
                   {tempLocation.city}{tempLocation.state ? `, ${tempLocation.state}` : ''}
@@ -430,7 +430,7 @@ export const LocationSelectionModal: React.FC<LocationSelectionModalProps> = ({
             className="py-2.5 px-5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
           >
             <CheckCircle2 size={15} />
-            <span>Set Location (लोकेशन सेट करें)</span>
+            <span>Set Location</span>
           </button>
         </div>
       </div>

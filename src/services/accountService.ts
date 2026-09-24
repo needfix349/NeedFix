@@ -15,7 +15,8 @@
 import { supabase, isSupabaseConfigured } from './supabaseClient';
 import { storageService } from './storage';
 import { deviceSecurityService } from './deviceSecurityService';
-import { UserProfile, SecurityQuestionConfig, PasswordResetRequest } from '../types';
+import { supabaseService } from './supabaseService';
+import { UserProfile, SecurityQuestionConfig, PasswordResetRequest, CustomerRecord, TechnicianProfile } from '../types';
 
 export const STANDARD_SECURITY_QUESTIONS = [
   'What is the name of your first school?',
@@ -104,6 +105,34 @@ class AccountService {
 
         if (username) {
           const cleanUser = username.trim().toLowerCase();
+
+          // 2a. Check 'technicians' table for is_blocked = true
+          const { data: techData, error: techErr } = await supabase
+            .from('technicians')
+            .select('is_blocked, status')
+            .or(`mobile.eq.${cleanUser},technician_code.ilike.${cleanUser},id.eq.${cleanUser}`)
+            .limit(1);
+
+          if (!techErr && techData && techData.length > 0) {
+            if (techData[0].is_blocked === true || techData[0].status === 'blocked') {
+              return { isBlocked: true, reason: blockedMsg };
+            }
+          }
+
+          // 2b. Check 'customers' table for is_blocked = true
+          const { data: custData, error: custErr } = await supabase
+            .from('customers')
+            .select('is_blocked, status')
+            .or(`phone.eq.${cleanUser},customer_id.ilike.${cleanUser},id.eq.${cleanUser}`)
+            .limit(1);
+
+          if (!custErr && custData && custData.length > 0) {
+            if (custData[0].is_blocked === true || custData[0].status === 'blocked') {
+              return { isBlocked: true, reason: blockedMsg };
+            }
+          }
+
+          // 2c. Check 'users' table
           const { data: userData, error: userErr } = await supabase
             .from('users')
             .select('status, is_blocked')
@@ -122,6 +151,479 @@ class AccountService {
     }
 
     return { isBlocked: false };
+  }
+
+  /**
+   * 1. Dedicated Customer Registration: Name + Mobile Number (Unique) + 4-Digit Secret PIN
+   * Zero-cost (no SMS/Email OTP). Bound to device_id.
+   * If device_id is blocked, account creation is prevented!
+   */
+  async registerCustomer(params: {
+    name: string;
+    mobileNumber: string;
+    pin: string;
+  }): Promise<AuthResponse> {
+    const cleanName = params.name.trim();
+    const cleanMobile = params.mobileNumber.trim().replace(/\D/g, '').slice(-10);
+    const cleanPin = params.pin.trim();
+    const deviceId = deviceSecurityService.getDeviceId();
+
+    if (!cleanName) {
+      return { success: false, message: 'Please enter your full name.' };
+    }
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      return { success: false, message: 'Please enter a valid 10-digit mobile number.' };
+    }
+    if (!cleanPin || !/^\d{4}$/.test(cleanPin)) {
+      return { success: false, message: 'Please set a 4-digit secret numeric PIN (e.g. 1234).' };
+    }
+
+    // Anti-fake Device Security check: Is this hardware device or IP blocked?
+    const deviceStatus = await deviceSecurityService.checkDeviceBlocked({ mobile: cleanMobile });
+    if (deviceStatus.isBlocked) {
+      storageService.clearSession(true);
+      return {
+        success: false,
+        isBlocked: true,
+        message: 'This device is blocked by Admin. You cannot create an account from this device.',
+      };
+    }
+
+    // Check if mobile number already exists in Supabase customers table
+    if (isSupabaseConfigured()) {
+      try {
+        const { data: existing, error } = await supabase
+          .from('customers')
+          .select('id, is_blocked')
+          .eq('mobile_number', cleanMobile)
+          .limit(1);
+
+        if (!error && existing && existing.length > 0) {
+          if (existing[0].is_blocked) {
+            storageService.clearSession(true);
+            return {
+              success: false,
+              isBlocked: true,
+              message: 'This mobile number has been blocked by Admin. Access denied.',
+            };
+          }
+          return {
+            success: false,
+            message: 'This mobile number is already registered! Please sign in using your 4-digit PIN.',
+          };
+        }
+      } catch (e) {
+        console.warn('Supabase customer registration check warning:', e);
+      }
+    }
+
+    // Also check local storage for duplicate mobile
+    const localCusts = storageService.getCustomers();
+    const localMatch = localCusts.find(
+      (c) => (c as any).mobile_number === cleanMobile || (c as any).phone === cleanMobile
+    );
+    if (localMatch) {
+      return {
+        success: false,
+        message: 'This mobile number is already registered! Please sign in using your 4-digit PIN.',
+      };
+    }
+
+    const newCustomerId =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `cust_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const nowIso = new Date().toISOString();
+
+    const customerRecord: CustomerRecord = {
+      id: newCustomerId,
+      customerId: `CUST-${cleanMobile.slice(-4)}`,
+      name: cleanName,
+      phone: cleanMobile,
+      mobile_number: cleanMobile,
+      pin: cleanPin,
+      deviceId: deviceId,
+      device_id: deviceId,
+      ipAddress: '',
+      isBlocked: false,
+      createdAt: nowIso,
+      lastSeenAt: nowIso,
+    };
+
+    // Save to Supabase customers table
+    if (isSupabaseConfigured()) {
+      try {
+        const { error: insertErr } = await supabase.from('customers').insert([{
+          id: newCustomerId,
+          name: cleanName,
+          mobile_number: cleanMobile,
+          pin: cleanPin,
+          device_id: deviceId,
+          is_blocked: false,
+          created_at: nowIso,
+          last_seen_at: nowIso,
+        }]);
+        if (insertErr) {
+          console.warn('Supabase customer insert notice:', insertErr.message);
+        }
+      } catch (err) {
+        console.warn('Supabase customer insert exception:', err);
+      }
+    }
+
+    // Save locally
+    storageService.saveCustomer(customerRecord);
+
+    const userProfile: UserProfile = {
+      id: newCustomerId,
+      username: cleanMobile,
+      name: cleanName,
+      mobile: cleanMobile,
+      countryCode: '+91',
+      role: 'customer',
+      createdAt: nowIso,
+      installationId: deviceId,
+      isBlocked: false,
+    };
+
+    storageService.setCurrentUser(userProfile);
+
+    return {
+      success: true,
+      user: userProfile,
+      message: 'Account created successfully! Welcome to NeedFix.',
+    };
+  }
+
+  /**
+   * 2. Dedicated Customer Login: Mobile Number + 4-Digit Secret PIN
+   * Zero-cost (no OTP).
+   */
+  async loginCustomer(params: {
+    mobileNumber: string;
+    pin: string;
+  }): Promise<AuthResponse> {
+    const cleanMobile = params.mobileNumber.trim().replace(/\D/g, '').slice(-10);
+    const cleanPin = params.pin.trim();
+    const deviceId = deviceSecurityService.getDeviceId();
+
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      return { success: false, message: 'Please enter your 10-digit registered mobile number.' };
+    }
+    if (!cleanPin || !/^\d{4}$/.test(cleanPin)) {
+      return { success: false, message: 'Please enter your 4-digit secret PIN.' };
+    }
+
+    // Check device security
+    const deviceStatus = await deviceSecurityService.checkDeviceBlocked({ mobile: cleanMobile });
+    if (deviceStatus.isBlocked) {
+      storageService.clearSession(true);
+      return {
+        success: false,
+        isBlocked: true,
+        message: 'Your account/device has been blocked by Admin. Access denied.',
+      };
+    }
+
+    let customerData: any = null;
+
+    // 1. Query Supabase customers table
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('mobile_number', cleanMobile)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          customerData = data[0];
+        }
+      } catch (err) {
+        console.warn('Supabase customer login query exception:', err);
+      }
+    }
+
+    // Fallback: check local storage customers
+    if (!customerData) {
+      const localCusts = storageService.getCustomers();
+      customerData = localCusts.find(
+        (c) => (c as any).mobile_number === cleanMobile || (c as any).phone === cleanMobile
+      );
+    }
+
+    if (!customerData) {
+      return {
+        success: false,
+        message: 'No customer account found with this mobile number. Please click "Sign Up" to create one.',
+      };
+    }
+
+    // Check blocked status
+    if (customerData.is_blocked || customerData.status === 'blocked') {
+      storageService.clearSession(true);
+      return {
+        success: false,
+        isBlocked: true,
+        message: 'Your account has been blocked by Admin. Access denied.',
+      };
+    }
+
+    // Verify 4-Digit PIN
+    const storedPin = String(customerData.pin || customerData.security_pin || '');
+    if (storedPin !== cleanPin) {
+      return {
+        success: false,
+        message: 'Incorrect 4-digit PIN. Please try again.',
+      };
+    }
+
+    // Update last_seen_at and device_id in Supabase
+    if (isSupabaseConfigured()) {
+      try {
+        await supabase
+          .from('customers')
+          .update({
+            last_seen_at: new Date().toISOString(),
+            device_id: deviceId,
+          })
+          .eq('mobile_number', cleanMobile);
+      } catch {}
+    }
+
+    const userProfile: UserProfile = {
+      id: customerData.id || `cust_${cleanMobile}`,
+      username: cleanMobile,
+      name: customerData.name || 'Customer',
+      mobile: cleanMobile,
+      countryCode: '+91',
+      role: 'customer',
+      createdAt: customerData.created_at || new Date().toISOString(),
+      installationId: deviceId,
+      isBlocked: false,
+    };
+
+    storageService.setCurrentUser(userProfile);
+
+    return {
+      success: true,
+      user: userProfile,
+      message: 'Login successful!',
+    };
+  }
+
+  /**
+   * Helper: Find customer record by mobile number in Supabase or local storage
+   */
+  async findCustomerByMobile(mobile: string): Promise<CustomerRecord | null> {
+    const cleanMobile = mobile.trim().replace(/\D/g, '').slice(-10);
+    if (!cleanMobile || cleanMobile.length !== 10) return null;
+
+    if (isSupabaseConfigured()) {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('mobile_number', cleanMobile)
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          const row = data[0];
+          return {
+            id: row.id,
+            customerId: row.customer_id || `CUST-${cleanMobile.slice(-4)}`,
+            name: row.name || 'Customer',
+            phone: row.mobile_number || cleanMobile,
+            mobile_number: row.mobile_number || cleanMobile,
+            pin: row.pin || '',
+            deviceId: row.device_id || '',
+            device_id: row.device_id || '',
+            ipAddress: '',
+            isBlocked: Boolean(row.is_blocked),
+            createdAt: row.created_at || new Date().toISOString(),
+            lastSeenAt: row.last_seen_at || new Date().toISOString(),
+          };
+        }
+      } catch (err) {
+        console.warn('findCustomerByMobile Supabase query notice:', err);
+      }
+    }
+
+    const localCusts = storageService.getCustomers();
+    const localMatch = localCusts.find(
+      (c) => (c as any).mobile_number === cleanMobile || (c as any).phone === cleanMobile
+    );
+    return localMatch || null;
+  }
+
+  /**
+   * 3. Dedicated Technician Login: Mobile Number + 4-Digit Secret PIN
+   * Technicians log in using their 10-digit mobile number and 4-digit PIN.
+   */
+  async loginTechnician(params: {
+    mobileNumber: string;
+    pin: string;
+  }): Promise<{
+    success: boolean;
+    user?: UserProfile;
+    technician?: TechnicianProfile;
+    isBlocked?: boolean;
+    message?: string;
+  }> {
+    const cleanMobile = params.mobileNumber.trim().replace(/\D/g, '').slice(-10);
+    const cleanPin = params.pin.trim();
+    const deviceId = deviceSecurityService.getDeviceId();
+
+    if (!cleanMobile || cleanMobile.length !== 10) {
+      return { success: false, message: 'Please enter a valid 10-digit mobile number.' };
+    }
+    if (!cleanPin || cleanPin.length !== 4) {
+      return { success: false, message: 'Please enter your 4-digit secret PIN.' };
+    }
+
+    // Check if device is blocked
+    const devBlock = await deviceSecurityService.checkDeviceBlocked({
+      mobile: cleanMobile,
+    });
+    if (devBlock.isBlocked) {
+      storageService.clearSession(true);
+      return {
+        success: false,
+        isBlocked: true,
+        message: 'This device/technician account is blocked by Admin. Access denied.',
+      };
+    }
+
+    // 1. Verify 4-Digit PIN against Customer / User record
+    const customerData = await this.findCustomerByMobile(cleanMobile);
+    if (customerData) {
+      if (customerData.isBlocked || (customerData as any).is_blocked) {
+        storageService.clearSession(true);
+        return {
+          success: false,
+          isBlocked: true,
+          message: 'This account has been blocked by Admin. Access denied.',
+        };
+      }
+
+      const storedPin = String(customerData.pin || (customerData as any).security_pin || '');
+      if (storedPin && storedPin !== cleanPin) {
+        return {
+          success: false,
+          message: 'Incorrect 4-digit PIN. Please try again.',
+        };
+      }
+    }
+
+    // 2. Query Supabase technicians table & local storage for this mobile
+    let techRow: any = null;
+    if (isSupabaseConfigured()) {
+      try {
+        const filters = [
+          `mobile.eq.${cleanMobile}`,
+          `whatsapp_number.eq.${cleanMobile}`,
+        ];
+        if (customerData?.id) {
+          filters.push(`user_id.eq.${customerData.id}`);
+          filters.push(`id.eq.${customerData.id}`);
+        }
+        const { data, error } = await supabase
+          .from('technicians')
+          .select('*')
+          .or(filters.join(','))
+          .limit(1);
+
+        if (!error && data && data.length > 0) {
+          techRow = data[0];
+        }
+      } catch (err) {
+        console.warn('Supabase technician login query exception:', err);
+      }
+    }
+
+    // Fallback: check local storage technicians
+    if (!techRow) {
+      const allTechs = storageService.getTechnicians();
+      techRow = allTechs.find(
+        (t) =>
+          t.mobile === cleanMobile ||
+          t.whatsappNumber === cleanMobile ||
+          (customerData?.id && (t.userId === customerData.id || t.id === customerData.id))
+      );
+    }
+
+    if (!techRow) {
+      if (customerData) {
+        return {
+          success: false,
+          message: 'You have a registered customer account, but have not joined as a Service Provider yet. Click "Register as Service Provider" to apply.',
+        };
+      }
+      return {
+        success: false,
+        message: 'No service provider account found with this mobile number. Please register as a Service Provider.',
+      };
+    }
+
+    // Check if blocked
+    if (techRow.is_blocked || techRow.isBlocked || techRow.status === 'blocked') {
+      storageService.clearSession(true);
+      return {
+        success: false,
+        isBlocked: true,
+        message: 'This technician account has been blocked by Admin. Access denied.',
+      };
+    }
+
+    // Verify 4-Digit PIN directly against technician record's pin column if set
+    const technicianPin = String(techRow.pin || '').trim();
+    if (technicianPin && technicianPin !== '0000' && technicianPin !== cleanPin) {
+      return {
+        success: false,
+        message: 'Incorrect 4-digit PIN. Please try again.',
+      };
+    }
+
+    // If techRow exists but customerData was not present (e.g. legacy data), auto-seed customer record with this PIN
+    if (!customerData) {
+      await this.registerCustomer({
+        name: techRow.full_name || techRow.company_name || 'Service Provider',
+        mobileNumber: cleanMobile,
+        pin: cleanPin,
+      }).catch(() => {});
+    }
+
+    // Map to TechnicianProfile
+    const techProfile: TechnicianProfile = supabaseService.mapSupabaseRowToProfile(techRow);
+
+    // Save/sync locally
+    storageService.syncTechnicianFromRemote(techProfile);
+
+    // Build unified UserProfile for session (reusing the exact unified ID)
+    const unifiedId = customerData?.id || techProfile.userId || techProfile.id;
+    const techUser: UserProfile = {
+      id: unifiedId,
+      username: cleanMobile,
+      name: techProfile.fullName,
+      mobile: cleanMobile,
+      countryCode: '+91',
+      role: 'technician',
+      technicianId: techProfile.id,
+      isApproved: techProfile.isApproved,
+      isTechnicianRegistered: true,
+      createdAt: techProfile.createdAt || customerData?.createdAt || new Date().toISOString(),
+      installationId: deviceId,
+      isBlocked: false,
+    };
+
+    storageService.setCurrentUser(techUser);
+
+    return {
+      success: true,
+      user: techUser,
+      technician: techProfile,
+      message: 'Technician logged in successfully!',
+    };
   }
 
   /**

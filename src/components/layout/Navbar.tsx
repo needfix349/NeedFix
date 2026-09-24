@@ -41,6 +41,7 @@ interface NavbarProps {
   onNavigate: (view: 'home' | 'technician_dashboard' | 'admin_panel') => void;
   onOpenAuth: () => void;
   onOpenTechnicianRegistration: () => void;
+  onOpenTechnicianPortal?: () => void;
   onOpenHelpSupport: () => void;
   onLogout: () => void;
   onUpdateCity?: (cityName: string) => void;
@@ -58,6 +59,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onNavigate,
   onOpenAuth,
   onOpenTechnicianRegistration,
+  onOpenTechnicianPortal,
   onOpenHelpSupport,
   onLogout,
   onUpdateCity,
@@ -112,7 +114,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               id="top-bar-back-btn"
               onClick={handleBackClick}
               className="p-2 sm:px-3 sm:py-2 rounded-xl transition-all flex items-center gap-1.5 text-xs font-black shadow-xs active:scale-95 cursor-pointer shrink-0 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 shadow-blue-600/20"
-              title="Go back to previous screen (🔙 पिछली स्क्रीन पर वापस जाएं)"
+              title="Go back to previous screen"
               aria-label="Back navigation"
             >
               <ArrowLeft size={18} className="stroke-[2.5] shrink-0" />
@@ -246,15 +248,15 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span className="hidden sm:inline">Help & Complaints</span>
           </button>
 
-          {/* Become a Service Provider CTA button */}
+          {/* Partner Portal CTA button */}
           {!technicianProfile && (
             <button
               type="button"
-              onClick={onOpenTechnicianRegistration}
+              onClick={onOpenTechnicianPortal || onOpenTechnicianRegistration}
               className="hidden sm:flex items-center gap-1.5 py-2 px-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-blue-600/20 cursor-pointer"
             >
               <Briefcase size={14} />
-              <span>Become a Service Provider</span>
+              <span>Partner Portal</span>
             </button>
           )}
 
@@ -370,13 +372,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ) : (
                       <button
                         onClick={() => {
-                          onOpenTechnicianRegistration();
+                          if (onOpenTechnicianPortal) {
+                            onOpenTechnicianPortal();
+                          } else {
+                            onOpenTechnicianRegistration();
+                          }
                           setShowProfileMenu(false);
                         }}
-                        className="w-full text-left p-2 hover:bg-blue-50 text-blue-700 rounded-xl flex items-center gap-2 font-bold"
+                        className="w-full text-left p-2 hover:bg-blue-50 text-blue-700 rounded-xl flex items-center gap-2 font-bold cursor-pointer"
                       >
                         <Briefcase size={14} />
-                        <span>Become a Service Provider</span>
+                        <span>Partner / Technician Portal</span>
                       </button>
                     )}
 
@@ -445,9 +451,9 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               type="button"
               onClick={onOpenAuth}
-              className="py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors"
+              className="py-2 px-4 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
             >
-              Sign In
+              Customer Sign In
             </button>
           )}
         </div>

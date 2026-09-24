@@ -56,6 +56,7 @@ export interface UserProfile {
   createdAt: string;
   isTechnicianRegistered?: boolean;
   technicianId?: string;
+  isApproved?: boolean;
   hasAgreedNotice?: boolean;
   noticeAgreedAt?: string;
   kyc_status?: KYCStatus;
@@ -112,6 +113,7 @@ export interface TechnicianProfile {
   userId: string;
   fullName: string;
   mobile: string;
+  pin?: string; // 4-digit secret PIN for mobile & PIN authentication
   whatsappNumber: string;
   email?: string;
   companyName: string;
@@ -229,8 +231,11 @@ export interface CustomerRecord {
   userId?: string;
   name: string;
   phone?: string;
+  mobile_number?: string;
+  pin?: string;
   ipAddress: string;
   deviceId: string;
+  device_id?: string;
   userAgent?: string;
   lastSeenAt: string;
   createdAt: string;

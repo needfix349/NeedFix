@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS public.technicians (
     full_name TEXT NOT NULL,
     company_name TEXT,
     mobile TEXT NOT NULL,
+    pin TEXT DEFAULT '0000',     -- 4-Digit Secret PIN for authentication
     whatsapp_number TEXT NOT NULL,
     category_id TEXT NOT NULL,
     category_name TEXT NOT NULL,
@@ -99,8 +100,12 @@ CREATE TABLE IF NOT EXISTS public.technicians (
     created_at TIMESTAMPTZ DEFAULT TIMEZONE('utc'::text, NOW())
 );
 
+ALTER TABLE public.technicians ADD COLUMN IF NOT EXISTS pin TEXT DEFAULT '0000';
+
 CREATE INDEX IF NOT EXISTS idx_technicians_user_id ON public.technicians(user_id);
 CREATE INDEX IF NOT EXISTS idx_technicians_code ON public.technicians(technician_code);
+CREATE INDEX IF NOT EXISTS idx_technicians_mobile ON public.technicians(mobile);
+CREATE INDEX IF NOT EXISTS idx_technicians_pin ON public.technicians(pin);
 CREATE INDEX IF NOT EXISTS idx_technicians_status ON public.technicians(status);
 CREATE INDEX IF NOT EXISTS idx_technicians_is_approved ON public.technicians(is_approved);
 CREATE INDEX IF NOT EXISTS idx_technicians_is_blocked ON public.technicians(is_blocked);

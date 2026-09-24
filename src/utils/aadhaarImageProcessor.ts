@@ -295,13 +295,13 @@ export async function mergeAadhaarFrontAndBack(
   };
 
   // 3. Draw Front Card
-  drawCard(frontImg, 'FRONT SIDE (फोटो, नाम एवं जन्मतिथि)', 'Identity Details', '#0284c7');
+  drawCard(frontImg, 'FRONT SIDE - Photo & Identity Details', 'Identity Details', '#0284c7');
 
   // Gap between cards
   currentY += gap;
 
   // 4. Draw Back Card
-  drawCard(backImg, 'BACK SIDE (पता, बारकोड एवं सुरक्षा क्यूआर)', 'Address & Security Details', '#059669');
+  drawCard(backImg, 'BACK SIDE - Address & Security Details', 'Address & Security Details', '#059669');
 
   // 5. Footer Bar
   currentY += padding;

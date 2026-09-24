@@ -367,7 +367,7 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Services & Specializations (काम व विशेषज्ञता सूची)
+                  Services & Specializations
                 </h3>
                 <span className="text-[11px] text-blue-600 font-bold bg-blue-50 border border-blue-200 px-2 py-0.5 rounded-lg">
                   {technician.categoryName}

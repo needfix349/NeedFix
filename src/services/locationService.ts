@@ -4,54 +4,54 @@ import { ALL_INDIAN_DISTRICTS } from './districtData';
 export interface IndianState {
   id: number;
   name: string;
-  hindiName: string;
+  hindiName?: string;
   capital: string;
   majorHub: string;
   latitude: number;
   longitude: number;
 }
 
-// Complete List of All 28 States of India (भारत के सभी 28 राज्य)
+// Complete List of All 28 States of India
 export const ALL_INDIAN_STATES: IndianState[] = [
-  { id: 1, name: 'Andhra Pradesh', hindiName: 'आंध्र प्रदेश', capital: 'Amaravati', majorHub: 'Visakhapatnam', latitude: 17.6868, longitude: 83.2185 },
-  { id: 2, name: 'Arunachal Pradesh', hindiName: 'अरुणाचल प्रदेश', capital: 'Itanagar', majorHub: 'Itanagar', latitude: 27.0844, longitude: 93.6053 },
-  { id: 3, name: 'Assam', hindiName: 'असम', capital: 'Dispur', majorHub: 'Guwahati', latitude: 26.1445, longitude: 91.7362 },
-  { id: 4, name: 'Bihar', hindiName: 'बिहार', capital: 'Patna', majorHub: 'Patna', latitude: 25.5941, longitude: 85.1376 },
-  { id: 5, name: 'Chhattisgarh', hindiName: 'छत्तीसगढ़', capital: 'Raipur', majorHub: 'Raipur', latitude: 21.2514, longitude: 81.6296 },
-  { id: 6, name: 'Goa', hindiName: 'गोवा', capital: 'Panaji', majorHub: 'Panaji', latitude: 15.4909, longitude: 73.8278 },
-  { id: 7, name: 'Gujarat', hindiName: 'गुजरात', capital: 'Gandhinagar', majorHub: 'Ahmedabad', latitude: 23.0225, longitude: 72.5714 },
-  { id: 8, name: 'Haryana', hindiName: 'हरियाणा', capital: 'Chandigarh', majorHub: 'Gurugram', latitude: 28.4595, longitude: 77.0266 },
-  { id: 9, name: 'Himachal Pradesh', hindiName: 'हिमाचल प्रदेश', capital: 'Shimla', majorHub: 'Shimla', latitude: 31.1048, longitude: 77.1734 },
-  { id: 10, name: 'Jharkhand', hindiName: 'झारखण्ड', capital: 'Ranchi', majorHub: 'Jamshedpur', latitude: 22.8046, longitude: 86.2029 },
-  { id: 11, name: 'Karnataka', hindiName: 'कर्नाटक', capital: 'Bengaluru', majorHub: 'Bengaluru', latitude: 12.9716, longitude: 77.5946 },
-  { id: 12, name: 'Kerala', hindiName: 'केरल', capital: 'Thiruvananthapuram', majorHub: 'Kochi', latitude: 9.9312, longitude: 76.2673 },
-  { id: 13, name: 'Madhya Pradesh', hindiName: 'मध्य प्रदेश', capital: 'Bhopal', majorHub: 'Indore', latitude: 22.7196, longitude: 75.8577 },
-  { id: 14, name: 'Maharashtra', hindiName: 'महाराष्ट्र', capital: 'Mumbai', majorHub: 'Mumbai', latitude: 19.0760, longitude: 72.8777 },
-  { id: 15, name: 'Manipur', hindiName: 'मणिपुर', capital: 'Imphal', majorHub: 'Imphal', latitude: 24.8170, longitude: 93.9368 },
-  { id: 16, name: 'Meghalaya', hindiName: 'मेघालय', capital: 'Shillong', majorHub: 'Shillong', latitude: 25.5788, longitude: 91.8933 },
-  { id: 17, name: 'Mizoram', hindiName: 'मिज़ोरम', capital: 'Aizawl', majorHub: 'Aizawl', latitude: 23.7271, longitude: 92.7176 },
-  { id: 18, name: 'Nagaland', hindiName: 'नागालैंड', capital: 'Kohima', majorHub: 'Dimapur', latitude: 25.6751, longitude: 94.1086 },
-  { id: 19, name: 'Odisha', hindiName: 'ओडिशा', capital: 'Bhubaneswar', majorHub: 'Bhubaneswar', latitude: 20.2961, longitude: 85.8245 },
-  { id: 20, name: 'Punjab', hindiName: 'पंजाब', capital: 'Chandigarh', majorHub: 'Ludhiana', latitude: 30.9010, longitude: 75.8573 },
-  { id: 21, name: 'Rajasthan', hindiName: 'राजस्थान', capital: 'Jaipur', majorHub: 'Jaipur', latitude: 26.9124, longitude: 75.7873 },
-  { id: 22, name: 'Sikkim', hindiName: 'सिक्किम', capital: 'Gangtok', majorHub: 'Gangtok', latitude: 27.3389, longitude: 88.6065 },
-  { id: 23, name: 'Tamil Nadu', hindiName: 'तमिलनाडु', capital: 'Chennai', majorHub: 'Chennai', latitude: 13.0827, longitude: 80.2707 },
-  { id: 24, name: 'Telangana', hindiName: 'तेलंगाना', capital: 'Hyderabad', majorHub: 'Hyderabad', latitude: 17.3850, longitude: 78.4867 },
-  { id: 25, name: 'Tripura', hindiName: 'त्रिपुरा', capital: 'Agartala', majorHub: 'Agartala', latitude: 23.8315, longitude: 91.2868 },
-  { id: 26, name: 'Uttar Pradesh', hindiName: 'उत्तर प्रदेश', capital: 'Lucknow', majorHub: 'Noida / Lucknow', latitude: 26.8467, longitude: 80.9462 },
-  { id: 27, name: 'Uttarakhand', hindiName: 'उत्तराखंड', capital: 'Dehradun', majorHub: 'Dehradun', latitude: 30.3165, longitude: 78.0322 },
-  { id: 28, name: 'West Bengal', hindiName: 'पश्चिम बंगाल', capital: 'Kolkata', majorHub: 'Kolkata', latitude: 22.5726, longitude: 88.3639 },
+  { id: 1, name: 'Andhra Pradesh', capital: 'Amaravati', majorHub: 'Visakhapatnam', latitude: 17.6868, longitude: 83.2185 },
+  { id: 2, name: 'Arunachal Pradesh', capital: 'Itanagar', majorHub: 'Itanagar', latitude: 27.0844, longitude: 93.6053 },
+  { id: 3, name: 'Assam', capital: 'Dispur', majorHub: 'Guwahati', latitude: 26.1445, longitude: 91.7362 },
+  { id: 4, name: 'Bihar', capital: 'Patna', majorHub: 'Patna', latitude: 25.5941, longitude: 85.1376 },
+  { id: 5, name: 'Chhattisgarh', capital: 'Raipur', majorHub: 'Raipur', latitude: 21.2514, longitude: 81.6296 },
+  { id: 6, name: 'Goa', capital: 'Panaji', majorHub: 'Panaji', latitude: 15.4909, longitude: 73.8278 },
+  { id: 7, name: 'Gujarat', capital: 'Gandhinagar', majorHub: 'Ahmedabad', latitude: 23.0225, longitude: 72.5714 },
+  { id: 8, name: 'Haryana', capital: 'Chandigarh', majorHub: 'Gurugram', latitude: 28.4595, longitude: 77.0266 },
+  { id: 9, name: 'Himachal Pradesh', capital: 'Shimla', majorHub: 'Shimla', latitude: 31.1048, longitude: 77.1734 },
+  { id: 10, name: 'Jharkhand', capital: 'Ranchi', majorHub: 'Jamshedpur', latitude: 22.8046, longitude: 86.2029 },
+  { id: 11, name: 'Karnataka', capital: 'Bengaluru', majorHub: 'Bengaluru', latitude: 12.9716, longitude: 77.5946 },
+  { id: 12, name: 'Kerala', capital: 'Thiruvananthapuram', majorHub: 'Kochi', latitude: 9.9312, longitude: 76.2673 },
+  { id: 13, name: 'Madhya Pradesh', capital: 'Bhopal', majorHub: 'Indore', latitude: 22.7196, longitude: 75.8577 },
+  { id: 14, name: 'Maharashtra', capital: 'Mumbai', majorHub: 'Mumbai', latitude: 19.0760, longitude: 72.8777 },
+  { id: 15, name: 'Manipur', capital: 'Imphal', majorHub: 'Imphal', latitude: 24.8170, longitude: 93.9368 },
+  { id: 16, name: 'Meghalaya', capital: 'Shillong', majorHub: 'Shillong', latitude: 25.5788, longitude: 91.8933 },
+  { id: 17, name: 'Mizoram', capital: 'Aizawl', majorHub: 'Aizawl', latitude: 23.7271, longitude: 92.7176 },
+  { id: 18, name: 'Nagaland', capital: 'Kohima', majorHub: 'Dimapur', latitude: 25.6751, longitude: 94.1086 },
+  { id: 19, name: 'Odisha', capital: 'Bhubaneswar', majorHub: 'Bhubaneswar', latitude: 20.2961, longitude: 85.8245 },
+  { id: 20, name: 'Punjab', capital: 'Chandigarh', majorHub: 'Ludhiana', latitude: 30.9010, longitude: 75.8573 },
+  { id: 21, name: 'Rajasthan', capital: 'Jaipur', majorHub: 'Jaipur', latitude: 26.9124, longitude: 75.7873 },
+  { id: 22, name: 'Sikkim', capital: 'Gangtok', majorHub: 'Gangtok', latitude: 27.3389, longitude: 88.6065 },
+  { id: 23, name: 'Tamil Nadu', capital: 'Chennai', majorHub: 'Chennai', latitude: 13.0827, longitude: 80.2707 },
+  { id: 24, name: 'Telangana', capital: 'Hyderabad', majorHub: 'Hyderabad', latitude: 17.3850, longitude: 78.4867 },
+  { id: 25, name: 'Tripura', capital: 'Agartala', majorHub: 'Agartala', latitude: 23.8315, longitude: 91.2868 },
+  { id: 26, name: 'Uttar Pradesh', capital: 'Lucknow', majorHub: 'Noida / Lucknow', latitude: 26.8467, longitude: 80.9462 },
+  { id: 27, name: 'Uttarakhand', capital: 'Dehradun', majorHub: 'Dehradun', latitude: 30.3165, longitude: 78.0322 },
+  { id: 28, name: 'West Bengal', capital: 'Kolkata', majorHub: 'Kolkata', latitude: 22.5726, longitude: 88.3639 },
 ];
 
 export const UNION_TERRITORIES: IndianState[] = [
-  { id: 101, name: 'Delhi (NCT)', hindiName: 'दिल्ली', capital: 'New Delhi', majorHub: 'New Delhi', latitude: 28.6139, longitude: 77.2090 },
-  { id: 102, name: 'Jammu and Kashmir', hindiName: 'जम्मू और कश्मीर', capital: 'Srinagar / Jammu', majorHub: 'Srinagar', latitude: 34.0837, longitude: 74.7973 },
-  { id: 103, name: 'Ladakh', hindiName: 'लद्दाख', capital: 'Leh', majorHub: 'Leh', latitude: 34.1526, longitude: 77.5771 },
-  { id: 104, name: 'Chandigarh', hindiName: 'चंडीगढ़', capital: 'Chandigarh', majorHub: 'Chandigarh', latitude: 30.7333, longitude: 76.7794 },
-  { id: 105, name: 'Puducherry', hindiName: 'पुडुचेरी', capital: 'Puducherry', majorHub: 'Puducherry', latitude: 11.9416, longitude: 79.8083 },
-  { id: 106, name: 'Dadra and Nagar Haveli and Daman and Diu', hindiName: 'दादरा नगर हवेली एवं दमन दीव', capital: 'Daman', majorHub: 'Daman', latitude: 20.4283, longitude: 72.8397 },
-  { id: 107, name: 'Andaman and Nicobar Islands', hindiName: 'अंडमान और निकोबार द्वीप समूह', capital: 'Port Blair', majorHub: 'Port Blair', latitude: 11.6234, longitude: 92.7265 },
-  { id: 108, name: 'Lakshadweep', hindiName: 'लक्षद्वीप', capital: 'Kavaratti', majorHub: 'Kavaratti', latitude: 10.5667, longitude: 72.6417 },
+  { id: 101, name: 'Delhi (NCT)', capital: 'New Delhi', majorHub: 'New Delhi', latitude: 28.6139, longitude: 77.2090 },
+  { id: 102, name: 'Jammu and Kashmir', capital: 'Srinagar / Jammu', majorHub: 'Srinagar', latitude: 34.0837, longitude: 74.7973 },
+  { id: 103, name: 'Ladakh', capital: 'Leh', majorHub: 'Leh', latitude: 34.1526, longitude: 77.5771 },
+  { id: 104, name: 'Chandigarh', capital: 'Chandigarh', majorHub: 'Chandigarh', latitude: 30.7333, longitude: 76.7794 },
+  { id: 105, name: 'Puducherry', capital: 'Puducherry', majorHub: 'Puducherry', latitude: 11.9416, longitude: 79.8083 },
+  { id: 106, name: 'Dadra and Nagar Haveli and Daman and Diu', capital: 'Daman', majorHub: 'Daman', latitude: 20.4283, longitude: 72.8397 },
+  { id: 107, name: 'Andaman and Nicobar Islands', capital: 'Port Blair', majorHub: 'Port Blair', latitude: 11.6234, longitude: 92.7265 },
+  { id: 108, name: 'Lakshadweep', capital: 'Kavaratti', majorHub: 'Kavaratti', latitude: 10.5667, longitude: 72.6417 },
 ];
 
 export {

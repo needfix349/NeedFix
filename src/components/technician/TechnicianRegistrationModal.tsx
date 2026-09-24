@@ -26,6 +26,9 @@ import {
   Building2,
   Minus,
   Plus,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { UserProfile, TechnicianProfile, UserLocation } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
@@ -33,6 +36,7 @@ import { CategoryLogo } from '../common/CategoryLogo';
 import { storageService } from '../../services/storage';
 import { supabaseService } from '../../services/supabaseService';
 import { deviceSecurityService } from '../../services/deviceSecurityService';
+import { accountService } from '../../services/accountService';
 import { getCurrentGPSLocation, DEFAULT_USER_LOCATION } from '../../services/locationService';
 import { GuidedAadhaarKYCModal } from '../kyc/GuidedAadhaarKYCModal';
 import { compressCardImage, mergeAadhaarFrontAndBack } from '../../utils/aadhaarImageProcessor';
@@ -40,7 +44,7 @@ import { compressCardImage, mergeAadhaarFrontAndBack } from '../../utils/aadhaar
 interface TechnicianRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  currentUser: UserProfile;
+  currentUser?: UserProfile | null;
   onSubmitted: (submittedProfile: TechnicianProfile) => void;
 }
 
@@ -54,15 +58,41 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
 
   // 1. Business / Store / Company & Contact Details
   const [companyName, setCompanyName] = useState('');
-  const [mobile, setMobile] = useState(currentUser.mobile || '');
-  const [whatsappNumber, setWhatsappNumber] = useState(currentUser.mobile || '');
+  const [mobile, setMobile] = useState(currentUser?.mobile || '');
+  const [whatsappNumber, setWhatsappNumber] = useState(currentUser?.mobile || '');
   const [sameAsMobile, setSameAsMobile] = useState(true);
+  const [secretPin, setSecretPin] = useState('');
+  const [showSecretPin, setShowSecretPin] = useState(false);
+  const [existingCustomerRecord, setExistingCustomerRecord] = useState<any>(null);
+  const [isCheckingCustomer, setIsCheckingCustomer] = useState(false);
   const [workshopLocation, setWorkshopLocation] = useState<UserLocation | null>(
-    currentUser.location || null
+    currentUser?.location || null
   );
   const [isLocatingGPS, setIsLocatingGPS] = useState(false);
   const [gpsLockSuccess, setGpsLockSuccess] = useState(false);
   const [gpsLockError, setGpsLockError] = useState<string | null>(null);
+
+  // Check if entered mobile belongs to an existing customer to link accounts seamlessly
+  React.useEffect(() => {
+    if (currentUser) return;
+    const clean = mobile.replace(/\D/g, '').slice(-10);
+    if (clean.length === 10) {
+      setIsCheckingCustomer(true);
+      let isCurrent = true;
+      accountService.findCustomerByMobile(clean).then((cust) => {
+        if (isCurrent) {
+          setExistingCustomerRecord(cust);
+          setIsCheckingCustomer(false);
+        }
+      });
+      return () => {
+        isCurrent = false;
+      };
+    } else {
+      setExistingCustomerRecord(null);
+      setIsCheckingCustomer(false);
+    }
+  }, [mobile, currentUser]);
 
   // Automatically fetch current location on map when technician opens location setup
   React.useEffect(() => {
@@ -77,7 +107,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
           })
           .catch((err) => {
             console.warn('Notice: GPS auto-detect fallback:', err);
-            setWorkshopLocation(currentUser.location || DEFAULT_USER_LOCATION);
+            setWorkshopLocation(currentUser?.location || DEFAULT_USER_LOCATION);
           })
           .finally(() => {
             setIsLocatingGPS(false);
@@ -329,10 +359,33 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         setErrorMessage('Please enter your Shop / Store / Company Name.');
         return;
       }
-      if (!mobile.trim() || !whatsappNumber.trim()) {
-        setErrorMessage('Please enter valid mobile and WhatsApp numbers.');
+      const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
+      if (!cleanMobile || cleanMobile.length !== 10) {
+        setErrorMessage('Please enter a valid 10-digit mobile number.');
         return;
       }
+      if (!whatsappNumber.trim()) {
+        setErrorMessage('Please enter a valid WhatsApp number.');
+        return;
+      }
+
+      // Check PIN requirements if not already logged in as a customer
+      if (!currentUser) {
+        const cleanPin = secretPin.trim();
+        if (!cleanPin || cleanPin.length !== 4) {
+          setErrorMessage('Please enter a 4-digit secret PIN for account security.');
+          return;
+        }
+
+        if (existingCustomerRecord) {
+          const storedPin = String(existingCustomerRecord.pin || existingCustomerRecord.security_pin || '');
+          if (storedPin && storedPin !== cleanPin) {
+            setErrorMessage('The 4-digit PIN does not match your existing customer account. Please enter your correct customer PIN to link your profile.');
+            return;
+          }
+        }
+      }
+
       if (!workshopLocation) {
         setErrorMessage('Please click "Fetch Current Location" to set your workshop GPS coordinates.');
         return;
@@ -369,6 +422,30 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
     if (!hasAgreedTerms) {
       setErrorMessage('Please accept the verification terms to proceed.');
       return;
+    }
+
+    const cleanMobile = mobile.replace(/\D/g, '').slice(-10);
+    const cleanPin = secretPin.trim();
+
+    // Single Identity Policy: Preserve existing user/customer ID so no conflicting ID is generated
+    const effectiveUserId =
+      currentUser?.id ||
+      existingCustomerRecord?.id ||
+      (typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `usr_${cleanMobile}_${Date.now()}`);
+
+    // If registering directly without a prior customer account, register customer record now
+    if (!currentUser && !existingCustomerRecord && cleanPin.length === 4) {
+      try {
+        await accountService.registerCustomer({
+          name: companyName.trim(),
+          mobileNumber: cleanMobile,
+          pin: cleanPin,
+        });
+      } catch (custErr) {
+        console.warn('Customer auto-registration notice:', custErr);
+      }
     }
 
     setIsSubmitting(true);
@@ -414,9 +491,9 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         try {
           finalAadhaarDocUrl = await withTimeout(
             supabaseService.uploadAadhaarDocument(
-              new File([finalMergedBlob], `Aadhaar-2in1-${currentUser.id}.jpg`, { type: 'image/jpeg' }),
-              currentUser.id,
-              `Aadhaar-2in1-${currentUser.id}.jpg`
+              new File([finalMergedBlob], `Aadhaar-2in1-${effectiveUserId}.jpg`, { type: 'image/jpeg' }),
+              effectiveUserId,
+              `Aadhaar-2in1-${effectiveUserId}.jpg`
             ),
             4500,
             finalAadhaarDocUrl
@@ -427,7 +504,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       } else if (aadhaarFile) {
         try {
           finalAadhaarDocUrl = await withTimeout(
-            supabaseService.uploadAadhaarDocument(aadhaarFile, currentUser.id, aadhaarFileName),
+            supabaseService.uploadAadhaarDocument(aadhaarFile, effectiveUserId, aadhaarFileName),
             4500,
             finalAadhaarDocUrl
           );
@@ -441,7 +518,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
           finalAadhaarBackDocUrl = await withTimeout(
             supabaseService.uploadKYCDocument(
               aadhaarBackFile,
-              currentUser.id,
+              effectiveUserId,
               'aadhaar',
               'back',
               aadhaarBackFileName || 'Aadhaar-Back-Document.jpg'
@@ -483,14 +560,15 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       });
 
       const applicationData = {
-        userId: currentUser.id,
+        userId: effectiveUserId,
         technicianCode,
         ipAddress: '',
         deviceId: '',
         fullName: companyName.trim(),
         mobile: mobile.trim(),
+        pin: cleanPin || existingCustomerRecord?.pin || '0000',
         whatsappNumber: whatsappNumber.trim(),
-        email: currentUser.email || undefined,
+        email: currentUser?.email || undefined,
         companyName: companyName.trim(),
         categoryId: primaryCat.id,
         categoryName: primaryCat.name,
@@ -550,10 +628,17 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
 
       // Update current user role
       const updatedUser: UserProfile = {
-        ...currentUser,
+        ...(currentUser || {}),
+        id: effectiveUserId,
+        username: mobile.trim(),
+        name: companyName.trim(),
+        mobile: mobile.trim(),
+        countryCode: '+91',
         role: 'technician',
-        email: currentUser.email,
+        email: currentUser?.email,
         isTechnicianRegistered: true,
+        technicianId: effectiveUserId,
+        createdAt: currentUser?.createdAt || existingCustomerRecord?.createdAt || new Date().toISOString(),
       };
       storageService.setCurrentUser(updatedUser);
 
@@ -576,10 +661,11 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         const categoryNames = selectedCategories.map((c) => c.name);
 
         const fallbackProfile = storageService.submitTechnicianApplication({
-          userId: currentUser.id,
+          userId: effectiveUserId,
           technicianCode: `TECH-${Date.now().toString().slice(-4)}`,
           fullName: companyName.trim(),
           mobile: mobile.trim(),
+          pin: cleanPin || existingCustomerRecord?.pin || '0000',
           whatsappNumber: whatsappNumber.trim(),
           companyName: companyName.trim(),
           categoryId: primaryCat.id,
@@ -609,9 +695,16 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
         });
 
         const updatedUser: UserProfile = {
-          ...currentUser,
+          ...(currentUser || {}),
+          id: effectiveUserId,
+          username: mobile.trim(),
+          name: companyName.trim(),
+          mobile: mobile.trim(),
+          countryCode: '+91',
           role: 'technician',
           isTechnicianRegistered: true,
+          technicianId: effectiveUserId,
+          createdAt: currentUser?.createdAt || existingCustomerRecord?.createdAt || new Date().toISOString(),
         };
         storageService.setCurrentUser(updatedUser);
 
@@ -657,7 +750,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                 Register Technician / Store Profile
               </h2>
               <p className="text-xs text-blue-200">
-                दुकान या सर्विस प्रोवाइडर रजिस्ट्रेशन (Admin Approval Required)
+                Service Provider Registration (Admin Approval Required)
               </p>
             </div>
           </div>
@@ -793,6 +886,93 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                   </div>
                 </div>
               </div>
+
+              {/* Account Linking & 4-Digit Secret PIN */}
+              {currentUser ? (
+                <div className="bg-emerald-50 border border-emerald-200/80 rounded-2xl p-3 flex items-start gap-2.5 text-emerald-900 text-xs">
+                  <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-bold text-emerald-800">
+                      Linked to your active customer account (+91 {currentUser.mobile})
+                    </p>
+                    <p className="text-[11px] text-emerald-700 mt-0.5">
+                      Your existing user ID and 4-digit secret PIN will remain unified across Customer and Partner modes.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {existingCustomerRecord ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-2xl p-3.5 space-y-2">
+                      <div className="flex items-start gap-2 text-blue-900 text-xs">
+                        <CheckCircle2 size={16} className="text-blue-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="font-bold">
+                            Existing Customer Account Found (+91 {mobile.replace(/\D/g, '').slice(-10)})
+                          </p>
+                          <p className="text-[11px] text-blue-700">
+                            Enter your existing 4-digit PIN to link your Service Provider profile seamlessly to this account without creating a new ID.
+                          </p>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
+                          <Lock size={14} className="text-slate-500" />
+                          <span>Enter your 4-Digit Customer PIN <span className="text-red-500">*</span></span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input
+                            type={showSecretPin ? 'text' : 'password'}
+                            inputMode="numeric"
+                            maxLength={4}
+                            value={secretPin}
+                            onChange={(e) => setSecretPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            placeholder="••••"
+                            className="w-full px-3.5 py-2 text-sm bg-white border border-slate-300 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-bold tracking-widest"
+                            required
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSecretPin(!showSecretPin)}
+                            className="absolute right-3 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                          >
+                            {showSecretPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold uppercase tracking-wider text-slate-700 mb-1.5 flex items-center justify-between">
+                        <span className="flex items-center gap-1.5">
+                          <Lock size={14} className="text-slate-500" />
+                          <span>Create 4-Digit Secret PIN <span className="text-red-500">*</span></span>
+                        </span>
+                        <span className="text-[11px] text-slate-400 font-normal">used for partner login</span>
+                      </label>
+                      <div className="relative flex items-center">
+                        <input
+                          type={showSecretPin ? 'text' : 'password'}
+                          inputMode="numeric"
+                          maxLength={4}
+                          value={secretPin}
+                          onChange={(e) => setSecretPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          placeholder="Set 4-digit PIN (e.g. 1234)"
+                          className="w-full px-3.5 py-2.5 text-sm bg-slate-50/50 border border-slate-300 rounded-2xl focus:border-blue-600 focus:ring-2 focus:ring-blue-100 font-bold tracking-widest text-slate-900"
+                          required
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowSecretPin(!showSecretPin)}
+                          className="absolute right-3.5 p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showSecretPin ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Workshop Location: Native GPS Fetch & Text Status Badge */}
               <div className="space-y-3 pt-1">
@@ -958,7 +1138,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
               <div className="bg-amber-50 border border-amber-300/80 rounded-2xl p-3.5 flex items-start gap-2.5 text-amber-950 text-xs">
                 <Sparkles size={18} className="text-amber-600 shrink-0 mt-0.5" />
                 <div>
-                  <p className="font-bold">Select All Services You Provide (एकाधिक काम चुनें)</p>
+                  <p className="font-bold">Select All Services You Provide</p>
                   <p className="text-[11px] text-amber-900 mt-0.5 leading-relaxed">
                     You can select 1, 2, 3, or more categories (e.g. Electrician + AC Repair + Plumber).
                     Your shop will show up in customer searches for all selected trades!
@@ -987,7 +1167,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                             {cat.name}
                           </p>
                           <p className="text-[10px] text-slate-500 truncate">
-                            {cat.hindiName || cat.description}
+                            {cat.description}
                           </p>
                         </div>
                       </div>
@@ -1057,7 +1237,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-800">
-                    Store / Shop Photo or Logo <span className="text-slate-500 font-semibold text-[11px] normal-case tracking-normal">(Optional / ऐच्छिक)</span>
+                    Store / Shop Photo or Logo <span className="text-slate-500 font-semibold text-[11px] normal-case tracking-normal">(Optional)</span>
                   </label>
                   <span className="text-[11px] text-blue-700 font-semibold">Upload from Gallery or Camera</span>
                 </div>
@@ -1358,7 +1538,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                       <div className="flex items-center justify-between flex-wrap gap-1">
                         <div className="flex items-center gap-1.5 text-emerald-300 font-bold text-xs">
                           <CheckCircle2 size={16} className="text-emerald-400" />
-                          <span>2 Photos Merged into 1 Compressed Document (2 फोटो 1 फोटो बन गया)</span>
+                          <span>2 Photos Merged into 1 Compressed Document</span>
                         </div>
                         <span className="text-[10px] font-mono bg-emerald-900 text-emerald-200 px-2.5 py-0.5 rounded-full border border-emerald-700 font-semibold">
                           Compressed: {mergedSizeKb || '~180'} KB
@@ -1531,7 +1711,16 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
       <GuidedAadhaarKYCModal
         isOpen={isGuidedKYCOpen}
         onClose={() => setIsGuidedKYCOpen(false)}
-        currentUser={currentUser}
+        currentUser={
+          currentUser || {
+            id: 'tech_kyc',
+            name: companyName || 'Technician',
+            mobile: mobile || '9999999999',
+            countryCode: '+91',
+            role: 'technician',
+            createdAt: new Date().toISOString(),
+          }
+        }
         initialAadhaarNumber={aadhaarNumber}
         onKYCComplete={(data) => {
           setAadhaarNumber(data.aadhaarNumber);

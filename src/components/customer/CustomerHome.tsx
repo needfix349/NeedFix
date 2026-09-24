@@ -315,7 +315,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                     handleDetectGPS();
                   }}
                   disabled={isDetectingGps}
-                  title="Auto-detect current GPS location (री-डिटेक्ट GPS)"
+                  title="Auto-detect current GPS location"
                   className="p-1 sm:p-1.5 hover:bg-white/15 active:bg-white/25 rounded-lg text-blue-200 hover:text-white transition-colors cursor-pointer"
                 >
                   <RefreshCw size={13} className={isDetectingGps ? 'animate-spin text-amber-300' : ''} />
@@ -677,7 +677,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
               Grow your business with Needfix. Become a service provider.
             </span>
             <span className="text-[11px] text-slate-500 block">
-              Direct customer calls • Zero commission • Free registration
+              Direct customer calls • Verified experts • Professional partner network
             </span>
           </div>
         </div>

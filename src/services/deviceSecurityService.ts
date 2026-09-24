@@ -387,7 +387,18 @@ class DeviceSecurityService {
    * 6. Universal IP & Device Blocking Check
    * Queries 'blocked_devices' table in Supabase & local blacklist
    */
-  async checkDeviceBlocked(): Promise<DeviceSecurityStatus> {
+  /**
+   * 6. Universal IP, Device & Database Block Check for Both Technicians and Customers
+   * Queries 'blocked_devices', 'technicians', 'customers', and 'users' tables in Supabase
+   */
+  async checkDeviceBlocked(identifiers?: {
+    userId?: string;
+    mobile?: string;
+    username?: string;
+    role?: string;
+    technicianId?: string;
+    customerId?: string;
+  }): Promise<DeviceSecurityStatus> {
     const deviceId = this.getDeviceId();
     const ip = await this.getRealIPAddress();
     const defaultBlockedMessage = "Your account/device has been blocked by Admin. Access denied until unblocked.";
@@ -407,17 +418,30 @@ class DeviceSecurityService {
       };
     }
 
-    // 2. Query Supabase 'blocked_devices' table
+    // 1b. Check if active local user or technician profile is marked blocked
+    const activeUser = storageService.getCurrentUser();
+    if (activeUser?.isBlocked || (activeUser as any)?.status === 'blocked') {
+      storageService.clearSession(true);
+      return {
+        isBlocked: true,
+        reason: defaultBlockedMessage,
+        uniqueId: activeUser.username || activeUser.id,
+        ip,
+        deviceId,
+      };
+    }
+
     if (isSupabaseConfigured()) {
       try {
-        const { data, error } = await supabase
+        // 2. Query Supabase 'blocked_devices' table
+        const { data: blockedDevs, error: devErr } = await supabase
           .from('blocked_devices')
           .select('*')
           .or(`device_id.eq.${deviceId},ip_address.eq.${ip}`)
           .limit(1);
 
-        if (!error && data && data.length > 0) {
-          const item = data[0];
+        if (!devErr && blockedDevs && blockedDevs.length > 0) {
+          const item = blockedDevs[0];
           const record: BlockedDeviceRecord = {
             id: item.id || `block_${Date.now()}`,
             deviceId: item.device_id,
@@ -432,10 +456,7 @@ class DeviceSecurityService {
             blockedAt: item.blocked_at || new Date().toISOString(),
           };
 
-          // Clear session immediately upon block detection (silent)
           storageService.clearSession(true);
-
-          // Cache in local storage for persistent lock (silent)
           storageService.addBlockedDevice(record, true);
 
           return {
@@ -448,8 +469,177 @@ class DeviceSecurityService {
             deviceId,
           };
         }
+
+        // 3. Query Supabase 'technicians' table for is_blocked = true or status = 'blocked'
+        const techFilters: string[] = [`device_id.eq.${deviceId}`];
+        if (identifiers?.technicianId) {
+          techFilters.push(`id.eq.${identifiers.technicianId}`);
+        }
+        if (identifiers?.userId) {
+          techFilters.push(`id.eq.${identifiers.userId}`);
+          techFilters.push(`user_id.eq.${identifiers.userId}`);
+        }
+        if (identifiers?.mobile) {
+          techFilters.push(`mobile.eq.${identifiers.mobile}`);
+          techFilters.push(`whatsapp_number.eq.${identifiers.mobile}`);
+        }
+        if (identifiers?.username) {
+          techFilters.push(`technician_code.ilike.${identifiers.username}`);
+        }
+
+        if (techFilters.length > 0) {
+          const { data: techData, error: techErr } = await supabase
+            .from('technicians')
+            .select('id, technician_code, full_name, mobile, is_blocked, status')
+            .or(techFilters.join(','))
+            .limit(5);
+
+          if (!techErr && techData && techData.length > 0) {
+            const blockedTech = techData.find(
+              (t: any) => t.is_blocked === true || t.status === 'blocked'
+            );
+            if (blockedTech) {
+              const record: BlockedDeviceRecord = {
+                id: `block_tech_${blockedTech.id}`,
+                deviceId,
+                ipAddress: ip,
+                targetType: 'technician',
+                targetId: blockedTech.id,
+                uniqueId: blockedTech.technician_code || blockedTech.id,
+                targetName: blockedTech.full_name || 'Restricted Technician',
+                targetPhone: blockedTech.mobile,
+                reason: defaultBlockedMessage,
+                blockedBy: 'Admin',
+                blockedAt: new Date().toISOString(),
+              };
+
+              storageService.clearSession(true);
+              storageService.addBlockedDevice(record, true);
+
+              return {
+                isBlocked: true,
+                reason: defaultBlockedMessage,
+                blockedAt: record.blockedAt,
+                blockedBy: 'Admin',
+                uniqueId: record.uniqueId,
+                ip,
+                deviceId,
+              };
+            }
+          }
+        }
+
+        // 4. Query Supabase 'customers' table for is_blocked = true or status = 'blocked'
+        const custFilters: string[] = [`device_id.eq.${deviceId}`];
+        const currentCustId = this.getCustomerId();
+        if (currentCustId) {
+          custFilters.push(`customer_id.eq.${currentCustId}`);
+        }
+        if (identifiers?.customerId) {
+          custFilters.push(`customer_id.eq.${identifiers.customerId}`);
+        }
+        if (identifiers?.userId) {
+          custFilters.push(`id.eq.${identifiers.userId}`);
+          custFilters.push(`customer_id.eq.${identifiers.userId}`);
+        }
+        if (identifiers?.mobile) {
+          custFilters.push(`mobile_number.eq.${identifiers.mobile}`);
+          custFilters.push(`phone.eq.${identifiers.mobile}`);
+        }
+
+        if (custFilters.length > 0) {
+          const { data: custData, error: custErr } = await supabase
+            .from('customers')
+            .select('id, name, mobile_number, is_blocked')
+            .or(custFilters.join(','))
+            .limit(5);
+
+          if (!custErr && custData && custData.length > 0) {
+            const blockedCust = custData.find(
+              (c: any) => c.is_blocked === true || c.status === 'blocked'
+            );
+            if (blockedCust) {
+              const record: BlockedDeviceRecord = {
+                id: `block_cust_${blockedCust.id}`,
+                deviceId,
+                ipAddress: ip,
+                targetType: 'customer',
+                targetId: blockedCust.id,
+                uniqueId: blockedCust.mobile_number || 'CUST',
+                targetName: blockedCust.name || 'Restricted Customer',
+                targetPhone: blockedCust.mobile_number,
+                reason: defaultBlockedMessage,
+                blockedBy: 'Admin',
+                blockedAt: new Date().toISOString(),
+              };
+
+              storageService.clearSession(true);
+              storageService.addBlockedDevice(record, true);
+
+              return {
+                isBlocked: true,
+                reason: defaultBlockedMessage,
+                blockedAt: record.blockedAt,
+                blockedBy: 'Admin',
+                uniqueId: record.uniqueId,
+                ip,
+                deviceId,
+              };
+            }
+          }
+        }
+
+        // 5. Query Supabase 'users' table
+        const userFilters: string[] = [`installation_id.eq.${deviceId}`];
+        if (identifiers?.userId) {
+          userFilters.push(`id.eq.${identifiers.userId}`);
+        }
+        if (identifiers?.username) {
+          userFilters.push(`username.ilike.${identifiers.username}`);
+        }
+
+        if (userFilters.length > 0) {
+          const { data: userData, error: userErr } = await supabase
+            .from('users')
+            .select('id, username, name, status, is_blocked')
+            .or(userFilters.join(','))
+            .limit(5);
+
+          if (!userErr && userData && userData.length > 0) {
+            const blockedUser = userData.find(
+              (u: any) => u.status === 'blocked' || u.is_blocked === true
+            );
+            if (blockedUser) {
+              const record: BlockedDeviceRecord = {
+                id: `block_user_${blockedUser.id}`,
+                deviceId,
+                ipAddress: ip,
+                targetType: 'customer',
+                targetId: blockedUser.id,
+                uniqueId: blockedUser.username || blockedUser.id,
+                targetName: blockedUser.name || 'Restricted User',
+                reason: defaultBlockedMessage,
+                blockedBy: 'Admin',
+                blockedAt: new Date().toISOString(),
+              };
+
+              storageService.clearSession(true);
+              storageService.addBlockedDevice(record, true);
+
+              return {
+                isBlocked: true,
+                reason: defaultBlockedMessage,
+                blockedAt: record.blockedAt,
+                blockedBy: 'Admin',
+                uniqueId: record.uniqueId,
+                ip,
+                deviceId,
+              };
+            }
+          }
+        }
       } catch (err) {
-        console.warn('Supabase blocked_devices check exception:', err);
+        console.warn('Supabase universal block verification exception:', err);
       }
     }
 

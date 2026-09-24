@@ -44,7 +44,7 @@ export const HelpSupportModal: React.FC<HelpSupportModalProps> = ({
                 </span>
               </div>
               <p className="text-xs text-slate-300">
-                File a Complaint / Need Help? (सहायता एवं शिकायत दर्ज करें)
+                File a Complaint / Need Help?
               </p>
             </div>
           </div>
