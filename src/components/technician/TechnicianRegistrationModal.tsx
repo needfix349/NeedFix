@@ -584,12 +584,8 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
           `${companyName} offers expert services for ${categoryNames.join(
             ', '
           )} with verified tools, genuine parts, and satisfaction guarantee.`,
-        profilePhotoUrl:
-          companyLogoUrl.trim() ||
-          'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
-        companyLogoUrl:
-          companyLogoUrl.trim() ||
-          'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
+        profilePhotoUrl: companyLogoUrl.trim() || '',
+        companyLogoUrl: companyLogoUrl.trim() || '',
         portfolioImages: [],
         documents: {
           aadhaarNumber: cleanAadhaar,
@@ -672,7 +668,7 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
           businessAddress: workshopLocation?.address || 'Workshop',
           location: workshopLocation || { latitude: 28.6139, longitude: 77.2090, city: 'Delhi', area: 'Central', address: 'Workshop' },
           businessDescription: businessDescription.trim() || `${companyName} services`,
-          profilePhotoUrl: companyLogoUrl.trim() || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?w=300&auto=format&fit=crop&q=80',
+          profilePhotoUrl: companyLogoUrl.trim() || '',
           portfolioImages: [],
           startingPrice: 299,
           priceUnit: 'Visiting Fee',
@@ -1307,21 +1303,6 @@ export const TechnicianRegistrationModal: React.FC<TechnicianRegistrationModalPr
                           {logoFileName ? `📁 ${logoFileName}` : 'JPG, PNG, WebP (Max 8MB)'}
                         </span>
                         <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setCompanyLogoUrl(
-                                'https://images.unsplash.com/photo-1581092335397-9583fe92d232?w=300&auto=format&fit=crop&q=80'
-                              );
-                              setLogoFileName('sample-shop-photo.jpg');
-                              setLogoLoadError(false);
-                              setErrorMessage(null);
-                            }}
-                            className="text-blue-600 hover:underline text-[10px] font-medium cursor-pointer"
-                          >
-                            Sample Photo
-                          </button>
-                          <span>•</span>
                           <button
                             type="button"
                             onClick={() => setShowLogoUrlInput(!showLogoUrlInput)}

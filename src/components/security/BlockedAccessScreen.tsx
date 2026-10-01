@@ -55,15 +55,15 @@ export const BlockedAccessScreen: React.FC<BlockedAccessScreenProps> = ({
           </div>
 
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wider">
+            <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-red-500/20 border border-red-500/40 text-red-300 text-xs font-bold uppercase tracking-wider">
               <Ban size={13} />
-              <span>System Access Blocked & Frozen</span>
+              <span>Your ID Blocked from Admin</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-              Access Restricted
+              Your ID is Blocked from Admin
             </h1>
             <p className="text-xs sm:text-sm text-red-300 font-semibold max-w-md mx-auto leading-relaxed">
-              Your account/device has been blocked by Admin. Access denied until unblocked.
+              Your ID has been blocked from Admin. Access to all features and services has been restricted.
             </p>
           </div>
         </div>

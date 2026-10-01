@@ -28,6 +28,7 @@ import { CategoryLogo } from '../common/CategoryLogo';
 import { calculateDistanceKm } from '../../services/locationService';
 import { storageService } from '../../services/storage';
 import { deviceSecurityService } from '../../services/deviceSecurityService';
+import { getTechnicianDisplayPhoto, getTechnicianInitials } from '../../utils/technicianAvatar';
 
 interface TechnicianDetailModalProps {
   technician: TechnicianProfile;
@@ -68,14 +69,22 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
     setReviews(storageService.getReviews(technician.id));
   }, [technician.id]);
 
-  const distanceKm = userLocation
-    ? calculateDistanceKm(
-        userLocation.latitude,
-        userLocation.longitude,
-        technician.location.latitude,
-        technician.location.longitude
-      )
-    : null;
+  const distanceKm =
+    userLocation &&
+    technician.location &&
+    !isNaN(Number(userLocation.latitude)) &&
+    !isNaN(Number(userLocation.longitude)) &&
+    !isNaN(Number(technician.location.latitude)) &&
+    !isNaN(Number(technician.location.longitude))
+      ? calculateDistanceKm(
+          Number(userLocation.latitude),
+          Number(userLocation.longitude),
+          Number(technician.location.latitude),
+          Number(technician.location.longitude)
+        )
+      : null;
+
+  const displayPhoto = getTechnicianDisplayPhoto(technician.profilePhotoUrl, technician.companyLogoUrl);
 
   const getCustomerInfo = () => {
     const custId = deviceSecurityService.getCustomerId();
@@ -260,11 +269,17 @@ export const TechnicianDetailModal: React.FC<TechnicianDetailModalProps> = ({
         <div className="px-4 pb-2.5 pt-0 shrink-0 border-b border-slate-100 bg-white">
           <div className="flex items-start gap-3">
             <div className="relative shrink-0 -mt-5 sm:-mt-6">
-              <img
-                src={technician.profilePhotoUrl}
-                alt={technician.fullName}
-                className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl object-cover border-2 border-white shadow-md bg-white"
-              />
+              {displayPhoto ? (
+                <img
+                  src={displayPhoto}
+                  alt={technician.fullName}
+                  className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl object-cover border-2 border-white shadow-md bg-white"
+                />
+              ) : (
+                <div className="w-13 h-13 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border-2 border-white shadow-md flex items-center justify-center text-slate-700 font-bold text-base sm:text-lg select-none">
+                  {getTechnicianInitials(technician.fullName, technician.companyName)}
+                </div>
+              )}
               {technician.isOnline && (
                 <span
                   title="Available for immediate booking"

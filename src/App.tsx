@@ -229,7 +229,7 @@ export default function App() {
       setCurrentUser(null);
       setSecurityStatus({
         isBlocked: true,
-        reason: 'Your account/device has been blocked by Admin. Access denied until unblocked.',
+        reason: 'Your ID is Blocked from Admin. Access denied until unblocked.',
         deviceId: deviceSecurityService.getDeviceId(),
         ip: '',
       });
@@ -337,11 +337,26 @@ export default function App() {
       }
     });
 
+    const secPoll = setInterval(() => {
+      runDeviceSecurityVerification();
+    }, 5000);
+
+    const techSyncInterval = setInterval(() => {
+      supabaseService.getApprovedTechnicians().then((liveTechs) => {
+        if (liveTechs && liveTechs.length > 0) {
+          setTechnicians(liveTechs);
+        }
+      }).catch(console.warn);
+    }, 10000);
+
     return () => {
+      clearInterval(secPoll);
+      clearInterval(techSyncInterval);
       clearTimeout(noticeTimer);
       unsubStorage();
       subscription.unsubscribe();
       window.removeEventListener('popstate', onPopState);
+      window.removeEventListener('needfix_security_block', onSecurityBlock);
     };
   }, []);
 

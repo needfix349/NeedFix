@@ -22,11 +22,14 @@ import {
 import { TechnicianProfile, UserLocation, UserProfile, ServiceLead } from '../../types';
 import { SERVICE_CATEGORIES } from '../../data/categories';
 import { CategoryLogo } from '../common/CategoryLogo';
+import { ServiceCategoryCard } from '../common/ServiceCategoryCard';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { NeedFixAppIcon } from '../common/NeedFixAppIcon';
 import { calculateDistanceKm, MAJOR_CITIES, getCurrentGPSLocation } from '../../services/locationService';
 import { storageService } from '../../services/storage';
 import { deviceSecurityService } from '../../services/deviceSecurityService';
+import { getTechnicianDisplayPhoto, getTechnicianInitials } from '../../utils/technicianAvatar';
+import { EditTechnicianProfileModal } from '../technician/EditTechnicianProfileModal';
 
 interface MobileAppViewProps {
   technicians: TechnicianProfile[];
@@ -61,6 +64,24 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [isDetectingGps, setIsDetectingGps] = useState(false);
+  const [showTechnicianEditModal, setShowTechnicianEditModal] = useState(false);
+
+  // If current logged-in user is a technician, find their technician profile
+  const myTechProfile = currentUser?.role === 'technician'
+    ? technicians.find(
+        (t) =>
+          t.userId === currentUser.id ||
+          t.id === currentUser.id ||
+          (currentUser.technicianId && t.id === currentUser.technicianId) ||
+          (currentUser.mobile && (t.mobile === currentUser.mobile || t.whatsappNumber === currentUser.mobile))
+      ) || storageService.getTechnicians().find(
+        (t) =>
+          t.userId === currentUser.id ||
+          t.id === currentUser.id ||
+          (currentUser.technicianId && t.id === currentUser.technicianId) ||
+          (currentUser.mobile && (t.mobile === currentUser.mobile || t.whatsappNumber === currentUser.mobile))
+      )
+    : null;
 
   const currentLocation = currentUser.location || MAJOR_CITIES[0];
 
@@ -76,7 +97,10 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
     }
   };
 
-  const approvedTechnicians = technicians.filter((t) => t.status === 'approved');
+  // Strictly exclude blocked technicians from mobile view
+  const approvedTechnicians = technicians.filter(
+    (t) => (t.isApproved === true || t.status === 'approved') && !t.isBlocked && t.status !== 'blocked'
+  );
 
   const filteredTechnicians = approvedTechnicians
     .filter((tech) => {
@@ -215,42 +239,33 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                 </div>
               </div>
 
-              {/* 22 Categories Grid (Mobile Optimized) */}
-              <div className="space-y-2">
+              {/* 30 Categories Grid (Mobile Exactly 3 Columns with Numbered Badges 1-30) */}
+              <div className="space-y-2.5">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                    22 Trade Categories
+                    Service Categories ({SERVICE_CATEGORIES.length})
                   </h3>
                   {selectedCategory !== 'all' && (
                     <button
                       onClick={() => setSelectedCategory('all')}
-                      className="text-[11px] font-bold text-blue-600"
+                      className="text-[11px] font-bold text-blue-600 hover:underline cursor-pointer"
                     >
                       Show All
                     </button>
                   )}
                 </div>
 
-                <div className="grid grid-cols-4 gap-2">
-                  {/* 22 Specific Categories */}
-                  {SERVICE_CATEGORIES.map((cat) => {
+                <div className="grid grid-cols-3 gap-2 sm:gap-2.5">
+                  {SERVICE_CATEGORIES.map((cat, index) => {
                     const isSelected = selectedCategory === cat.id;
                     return (
-                      <button
+                      <ServiceCategoryCard
                         key={cat.id}
-                        type="button"
+                        category={cat}
+                        index={index}
+                        isSelected={isSelected}
                         onClick={() => setSelectedCategory(isSelected ? 'all' : cat.id)}
-                        className={`p-1.5 rounded-2xl border text-center flex flex-col items-center justify-between gap-1 transition-all group cursor-pointer ${
-                          isSelected
-                            ? 'bg-blue-50 text-blue-900 border-blue-600 ring-2 ring-blue-600/30'
-                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
-                        }`}
-                      >
-                        <CategoryLogo categoryId={cat.id} size="sm" className="w-8 h-8 rounded-xl" />
-                        <span className="text-[9px] font-bold leading-tight line-clamp-2 text-center">
-                          {cat.name}
-                        </span>
-                      </button>
+                      />
                     );
                   })}
                 </div>
@@ -284,12 +299,21 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                   <div className="space-y-3">
                     {filteredTechnicians.map((tech) => {
                       const isFav = favorites.includes(tech.id);
-                      const distance = calculateDistanceKm(
-                        currentLocation.latitude,
-                        currentLocation.longitude,
-                        tech.location.latitude,
-                        tech.location.longitude
-                      );
+                      const distance =
+                        currentLocation &&
+                        tech.location &&
+                        !isNaN(Number(currentLocation.latitude)) &&
+                        !isNaN(Number(currentLocation.longitude)) &&
+                        !isNaN(Number(tech.location.latitude)) &&
+                        !isNaN(Number(tech.location.longitude))
+                          ? calculateDistanceKm(
+                              Number(currentLocation.latitude),
+                              Number(currentLocation.longitude),
+                              Number(tech.location.latitude),
+                              Number(tech.location.longitude)
+                            )
+                          : 0;
+                      const techPhoto = getTechnicianDisplayPhoto(tech.profilePhotoUrl, tech.companyLogoUrl);
 
                       return (
                         <div
@@ -300,11 +324,17 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
                           {/* Card Header */}
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5">
-                              <img
-                                src={tech.profilePhotoUrl}
-                                alt={tech.fullName}
-                                className="w-12 h-12 rounded-xl object-cover border border-slate-100"
-                              />
+                              {techPhoto ? (
+                                <img
+                                  src={techPhoto}
+                                  alt={tech.fullName}
+                                  className="w-12 h-12 rounded-xl object-cover border border-slate-100"
+                                />
+                              ) : (
+                                <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-xs select-none">
+                                  {getTechnicianInitials(tech.fullName, tech.companyName)}
+                                </div>
+                              )}
                               <div>
                                 <div className="flex items-center gap-1">
                                   <h4 className="text-xs font-bold text-slate-900 truncate max-w-[150px]">
@@ -499,11 +529,21 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
                 <button
                   type="button"
-                  onClick={onOpenAuth}
+                  onClick={() => {
+                    if (currentUser.role === 'technician' && myTechProfile) {
+                      setShowTechnicianEditModal(true);
+                    } else {
+                      onOpenAuth();
+                    }
+                  }}
                   className="w-full py-2 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-blue-200/60"
                 >
                   <User size={14} />
-                  <span>Edit Name & Profile</span>
+                  <span>
+                    {currentUser.role === 'technician'
+                      ? 'Edit Technician Profile & Details'
+                      : 'Edit Name & Profile'}
+                  </span>
                 </button>
               </div>
 
@@ -577,6 +617,18 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
             <span className="text-[10px]">Account</span>
           </button>
         </div>
+
+        {/* Comprehensive Full Profile & Business Details Editor for Technicians */}
+        {showTechnicianEditModal && myTechProfile && (
+          <EditTechnicianProfileModal
+            isOpen={showTechnicianEditModal}
+            onClose={() => setShowTechnicianEditModal(false)}
+            technician={myTechProfile}
+            onUpdated={(updated) => {
+              setShowTechnicianEditModal(false);
+            }}
+          />
+        )}
 
       </div>
     </div>

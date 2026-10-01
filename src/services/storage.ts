@@ -483,7 +483,9 @@ class StorageService {
 
   // Customers must only see approved & non-blocked technicians!
   getApprovedTechnicians(): TechnicianProfile[] {
-    return this.getTechnicians().filter((t) => t.status === 'approved' && !t.isBlocked);
+    return this.getTechnicians().filter(
+      (t) => (t.status === 'approved' || t.isApproved === true) && !t.isBlocked && t.status !== 'blocked'
+    );
   }
 
   getTechnicianById(id: string): TechnicianProfile | undefined {

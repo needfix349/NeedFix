@@ -299,6 +299,44 @@ export class SupabaseService {
         console.warn('Supabase toggleTechnicianBlockStatus warning:', err);
       }
     }
+
+    // 3. Central Server API Synchronization for universal cross-device consistency
+    try {
+      const isBlocked = Boolean(updated?.isBlocked);
+      const effectiveStatus = isBlocked ? 'blocked' : 'approved';
+      fetch(`/api/technicians/${technicianId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          isBlocked,
+          status: effectiveStatus,
+          isOnline: isBlocked ? false : Boolean(updated?.isOnline),
+          blockedReason: isBlocked ? (reason || 'Blocked by Admin') : null,
+          blockedAt: isBlocked ? new Date().toISOString() : null,
+        }),
+      }).catch(() => {});
+
+      if (isBlocked) {
+        fetch('/api/blocked-devices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            targetType: 'technician',
+            targetId: technicianId,
+            uniqueId: updated?.technicianCode || technicianId,
+            targetName: updated?.fullName || 'Technician',
+            targetPhone: updated?.mobile,
+            reason: reason || 'Your ID is Blocked from Admin',
+            blockedBy: adminName,
+          }),
+        }).catch(() => {});
+      } else {
+        fetch(`/api/blocked-devices/${technicianId}`, {
+          method: 'DELETE',
+        }).catch(() => {});
+      }
+    } catch {}
+
     return updated;
   }
 
@@ -802,6 +840,7 @@ export class SupabaseService {
           is_online: tech.isOnline,
           profile_photo_url: tech.profilePhotoUrl,
           company_logo_url: tech.companyLogoUrl,
+          pin: tech.pin,
           updated_at: new Date().toISOString(),
         };
 
@@ -856,7 +895,7 @@ export class SupabaseService {
         area: d.area || 'Central',
         address: d.address || 'Workshop',
       },
-      profilePhotoUrl: d.profile_photo_url || d.profile_picture_url || 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
+      profilePhotoUrl: d.profile_photo_url || d.profile_picture_url || '',
       companyLogoUrl: d.company_logo_url || '',
       ipAddress: d.ip_address || '127.0.0.1',
       deviceId: d.device_id || 'DEV-VERIFIED',
@@ -913,9 +952,18 @@ export class SupabaseService {
 
           sbTechs.forEach((row: any) => {
             const mapped = this.mapSupabaseRowToProfile(row);
-            if (!mapped.isBlocked) {
+            if (!mapped.isBlocked && mapped.status !== 'blocked') {
               map.set(mapped.id, mapped);
               storageService.syncTechnicianFromRemote(mapped);
+            } else {
+              // Strictly remove from map and mark blocked in local storage
+              map.delete(mapped.id);
+              storageService.updateTechnicianProfile({
+                ...mapped,
+                isBlocked: true,
+                status: 'blocked',
+                isOnline: false,
+              });
             }
           });
           list = Array.from(map.values());
@@ -931,11 +979,19 @@ export class SupabaseService {
       if (res.ok) {
         const apiTechs: TechnicianProfile[] = await res.json();
         if (Array.isArray(apiTechs)) {
-          const approvedApi = apiTechs.filter((t) => (t.isApproved || t.status === 'approved') && !t.isBlocked);
+          const approvedApi = apiTechs.filter(
+            (t) => (t.isApproved || t.status === 'approved') && !t.isBlocked && t.status !== 'blocked'
+          );
           if (approvedApi.length > 0) {
             const map = new Map<string, TechnicianProfile>();
             list.forEach((t) => map.set(t.id, t));
-            approvedApi.forEach((t) => map.set(t.id, { ...map.get(t.id), ...t }));
+            approvedApi.forEach((t) => {
+              if (!t.isBlocked && t.status !== 'blocked') {
+                map.set(t.id, { ...map.get(t.id), ...t });
+              } else {
+                map.delete(t.id);
+              }
+            });
             list = Array.from(map.values());
           }
         }
@@ -943,6 +999,37 @@ export class SupabaseService {
     } catch (apiErr) {
       console.warn('API /api/technicians fetch error:', apiErr);
     }
+
+    // 3. Strictly cross-check against Blocked Devices from Central Server and Local Storage
+    try {
+      const blockedSet = new Set<string>();
+      storageService.getBlockedDevices().forEach((b) => {
+        if (b.uniqueId) blockedSet.add(b.uniqueId.toLowerCase());
+        if (b.targetId) blockedSet.add(b.targetId.toLowerCase());
+        if (b.targetPhone) blockedSet.add(b.targetPhone.replace(/\D/g, '').slice(-10));
+      });
+
+      const bRes = await fetch('/api/blocked-devices');
+      if (bRes.ok) {
+        const serverBlocked: any[] = await bRes.json();
+        if (Array.isArray(serverBlocked)) {
+          serverBlocked.forEach((b) => {
+            if (b.uniqueId) blockedSet.add(b.uniqueId.toLowerCase());
+            if (b.targetId) blockedSet.add(b.targetId.toLowerCase());
+            if (b.targetPhone) blockedSet.add(b.targetPhone.replace(/\D/g, '').slice(-10));
+          });
+        }
+      }
+
+      list = list.filter((t) => {
+        if (t.isBlocked || t.status === 'blocked') return false;
+        if (t.technicianCode && blockedSet.has(t.technicianCode.toLowerCase())) return false;
+        if (t.id && blockedSet.has(t.id.toLowerCase())) return false;
+        if (t.userId && blockedSet.has(t.userId.toLowerCase())) return false;
+        if (t.mobile && blockedSet.has(t.mobile.replace(/\D/g, '').slice(-10))) return false;
+        return true;
+      });
+    } catch {}
 
     return list;
   }
@@ -1132,7 +1219,7 @@ export class SupabaseService {
                   area: 'Central',
                   address: 'Workshop',
                 },
-                profilePhotoUrl: 'https://images.unsplash.com/photo-1540569014015-19a7be504e3a?w=150&auto=format&fit=crop&q=80',
+                profilePhotoUrl: '',
                 companyLogoUrl: '',
                 ipAddress: '127.0.0.1',
                 deviceId: u.installation_id || 'DEV-TECH',

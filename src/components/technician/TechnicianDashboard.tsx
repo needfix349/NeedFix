@@ -35,6 +35,7 @@ import { supabaseService } from '../../services/supabaseService';
 import { VerifiedBadge } from '../common/VerifiedBadge';
 import { getCurrentGPSLocation } from '../../services/locationService';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
+import { EditTechnicianProfileModal } from './EditTechnicianProfileModal';
 
 interface TechnicianDashboardProps {
   technician: TechnicianProfile;
@@ -46,6 +47,7 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
   onOpenEditApplication,
 }) => {
   const [tech, setTech] = useState<TechnicianProfile>(initialTech);
+  const [showFullEditModal, setShowFullEditModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'activity' | 'reviews' | 'edit'>('activity');
   const [reviews, setReviews] = useState<Review[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -358,11 +360,21 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
       >
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
           <div className="flex items-start gap-4">
-            <img
-              src={tech.profilePhotoUrl}
-              alt={tech.fullName}
-              className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg shrink-0"
-            />
+            {Boolean(
+              (tech.companyLogoUrl || tech.profilePhotoUrl || '').trim() &&
+              !(tech.companyLogoUrl || tech.profilePhotoUrl || '').includes('unsplash.com') &&
+              !(tech.companyLogoUrl || tech.profilePhotoUrl || '').includes('dicebear.com')
+            ) ? (
+              <img
+                src={tech.companyLogoUrl || tech.profilePhotoUrl}
+                alt={tech.fullName}
+                className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl object-cover border-2 border-white/30 shadow-lg shrink-0"
+              />
+            ) : (
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-white/10 border-2 border-white/20 flex items-center justify-center text-blue-300 shadow-lg shrink-0">
+                <Building2 size={32} />
+              </div>
+            )}
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-bold font-display text-white">
@@ -381,6 +393,17 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
 
           {/* Status Controls */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+            {/* Edit Complete Profile Button */}
+            <button
+              type="button"
+              onClick={() => setShowFullEditModal(true)}
+              className="py-2 px-3.5 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+              title="Edit Store Name, Address, GPS, Logo, Radius, and Trades"
+            >
+              <Edit size={14} />
+              <span>Edit Profile & Details</span>
+            </button>
+
             <button
               type="button"
               onClick={() => syncStatusWithDatabase(true)}
@@ -1231,6 +1254,21 @@ export const TechnicianDashboard: React.FC<TechnicianDashboardProps> = ({
           onClose={() => setShowWorkshopLocationModal(false)}
           currentLocation={tech.location}
           onSelectLocation={handleManualSelectWorkshopLocation}
+        />
+      )}
+
+      {/* Comprehensive Full Profile & Business Details Editor */}
+      {showFullEditModal && (
+        <EditTechnicianProfileModal
+          isOpen={showFullEditModal}
+          onClose={() => setShowFullEditModal(false)}
+          technician={tech}
+          onUpdated={(updated) => {
+            setTech(updated);
+            setEditBio(updated.businessDescription);
+            setEditRadius(updated.coverageRadiusKm);
+            setEditCoverageArea(updated.coverageAreaText);
+          }}
         />
       )}
     </div>

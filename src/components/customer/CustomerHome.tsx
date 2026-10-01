@@ -28,6 +28,7 @@ import {
   get_nearby_technicians,
 } from '../../services/locationService';
 import { CategoryLogo } from '../common/CategoryLogo';
+import { ServiceCategoryCard } from '../common/ServiceCategoryCard';
 import { TechnicianCard } from './TechnicianCard';
 import { LocationSelectionModal } from '../common/LocationSelectionModal';
 import { accountService } from '../../services/accountService';
@@ -131,15 +132,24 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
   // 1. All valid approved technicians in system with distance calculated from customer location
   const allApprovedWithDistance = useMemo(() => {
     return technicians
-      .filter((t) => (t.isApproved === true || t.status === 'approved') && !t.isBlocked)
+      .filter(
+        (t) =>
+          (t.isApproved === true || t.status === 'approved') &&
+          !t.isBlocked &&
+          t.status !== 'blocked'
+      )
       .map((tech) => {
         const techLat = Number(tech.location?.latitude);
         const techLng = Number(tech.location?.longitude);
         const dist =
-          !isNaN(techLat) && !isNaN(techLng)
+          !isNaN(techLat) &&
+          !isNaN(techLng) &&
+          currentLocation &&
+          !isNaN(Number(currentLocation.latitude)) &&
+          !isNaN(Number(currentLocation.longitude))
             ? calculateDistanceKm(
-                currentLocation.latitude,
-                currentLocation.longitude,
+                Number(currentLocation.latitude),
+                Number(currentLocation.longitude),
                 techLat,
                 techLng
               )
@@ -152,81 +162,75 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
       .sort((a, b) => a.calculatedDistanceKm - b.calculatedDistanceKm);
   }, [technicians, currentLocation.latitude, currentLocation.longitude]);
 
-  // 2. Technicians strictly within selected searchRadiusKm
-  const strictlyNearbyTechnicians = useMemo(() => {
-    return allApprovedWithDistance.filter((t) => t.calculatedDistanceKm <= searchRadiusKm);
-  }, [allApprovedWithDistance, searchRadiusKm]);
+  // 2. Filter by category, search text, favorites, and minimum rating
+  const allCategoryFiltered = useMemo(() => {
+    return allApprovedWithDistance.filter((tech) => {
+      if (showOnlyFavorites && !favorites.includes(tech.id)) return false;
 
-  // Determine whether we fall back to network-wide list if no technicians are within radius
-  const isFallbackToNetwork = strictlyNearbyTechnicians.length === 0 && allApprovedWithDistance.length > 0;
+      // Multi-category matching: show technicians for the selected service
+      if (selectedCategory !== 'all') {
+        const matchesCategory =
+          tech.categoryId === selectedCategory ||
+          (tech.categoryIds && tech.categoryIds.includes(selectedCategory));
+        if (!matchesCategory) return false;
+      }
 
-  // Filtered and sorted technicians
+      if (minRating > 0 && tech.rating < minRating) return false;
+
+      // Search text matching
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const matchName = tech.fullName.toLowerCase().includes(q);
+        const matchCompany = tech.companyName.toLowerCase().includes(q);
+        const matchCategory =
+          tech.categoryName.toLowerCase().includes(q) ||
+          (tech.categoryIds &&
+            tech.categoryIds.some((cid) => {
+              const c = SERVICE_CATEGORIES.find((sc) => sc.id === cid);
+              return c?.name.toLowerCase().includes(q);
+            })) ||
+          (tech.categoryNames &&
+            tech.categoryNames.some((catName) => catName.toLowerCase().includes(q)));
+        const matchArea = tech.coverageAreaText?.toLowerCase().includes(q);
+        const matchDesc = tech.businessDescription.toLowerCase().includes(q);
+        if (!matchName && !matchCompany && !matchCategory && !matchArea && !matchDesc) {
+          return false;
+        }
+      }
+      return true;
+    });
+  }, [allApprovedWithDistance, showOnlyFavorites, favorites, selectedCategory, minRating, searchQuery]);
+
+  // 3. Technicians in this category strictly within selected searchRadiusKm
+  const strictlyNearbyInCategory = useMemo(() => {
+    return allCategoryFiltered.filter((t) => t.calculatedDistanceKm <= searchRadiusKm);
+  }, [allCategoryFiltered, searchRadiusKm]);
+
+  // Determine whether we fall back to closest specialists if none are strictly within radius
+  const isFallbackToNetwork = strictlyNearbyInCategory.length === 0 && allCategoryFiltered.length > 0;
+
+  // Final sorted list of technicians
   const filteredTechnicians = useMemo(() => {
-    // If user typed a search query or no technicians are strictly within radius, search against all approved
-    const candidateList =
-      searchQuery.trim() || strictlyNearbyTechnicians.length === 0
-        ? allApprovedWithDistance
-        : strictlyNearbyTechnicians;
+    const list =
+      strictlyNearbyInCategory.length > 0 || searchQuery.trim()
+        ? strictlyNearbyInCategory
+        : allCategoryFiltered;
 
-    return candidateList
-      .filter((tech) => {
-        if (showOnlyFavorites && !favorites.includes(tech.id)) return false;
-        
-        // Multi-category matching: show technicians for the selected service
-        if (selectedCategory !== 'all') {
-          const matchesCategory =
-            tech.categoryId === selectedCategory ||
-            (tech.categoryIds && tech.categoryIds.includes(selectedCategory));
-          if (!matchesCategory) return false;
-        }
+    return [...list].sort((a, b) => {
+      // 1. Live Online Technicians ALWAYS prioritized at the top!
+      const onlineA = a.isOnline ? 1 : 0;
+      const onlineB = b.isOnline ? 1 : 0;
+      if (onlineA !== onlineB) return onlineB - onlineA;
 
-        if (minRating > 0 && tech.rating < minRating) return false;
+      // 2. Proximity priority: closest to current GPS comes first
+      if (a.calculatedDistanceKm !== b.calculatedDistanceKm) {
+        return a.calculatedDistanceKm - b.calculatedDistanceKm;
+      }
 
-        // Search text matching
-        if (searchQuery.trim()) {
-          const q = searchQuery.toLowerCase();
-          const matchName = tech.fullName.toLowerCase().includes(q);
-          const matchCompany = tech.companyName.toLowerCase().includes(q);
-          const matchCategory =
-            tech.categoryName.toLowerCase().includes(q) ||
-            (tech.categoryIds &&
-              tech.categoryIds.some((cid) => {
-                const c = SERVICE_CATEGORIES.find((sc) => sc.id === cid);
-                return c?.name.toLowerCase().includes(q);
-              })) ||
-            (tech.categoryNames &&
-              tech.categoryNames.some((catName) => catName.toLowerCase().includes(q)));
-          const matchArea = tech.coverageAreaText?.toLowerCase().includes(q);
-          const matchDesc = tech.businessDescription.toLowerCase().includes(q);
-          if (!matchName && !matchCompany && !matchCategory && !matchArea && !matchDesc) {
-            return false;
-          }
-        }
-        return true;
-      })
-      .sort((a, b) => {
-        // 1. Live Online Technicians ALWAYS prioritized at the top!
-        const onlineA = a.isOnline ? 1 : 0;
-        const onlineB = b.isOnline ? 1 : 0;
-        if (onlineA !== onlineB) return onlineB - onlineA;
-
-        // 2. Proximity priority: closest to current GPS comes first
-        if (a.calculatedDistanceKm !== b.calculatedDistanceKm) {
-          return a.calculatedDistanceKm - b.calculatedDistanceKm;
-        }
-
-        // 3. Rating priority
-        return b.rating - a.rating;
-      });
-  }, [
-    strictlyNearbyTechnicians,
-    allApprovedWithDistance,
-    showOnlyFavorites,
-    favorites,
-    selectedCategory,
-    minRating,
-    searchQuery,
-  ]);
+      // 3. Rating priority
+      return b.rating - a.rating;
+    });
+  }, [strictlyNearbyInCategory, allCategoryFiltered, searchQuery]);
 
   const activeCategoryObj = SERVICE_CATEGORIES.find((c) => c.id === selectedCategory);
 
@@ -470,15 +474,16 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-7 gap-2.5">
-          {/* 25 Categories */}
-          {SERVICE_CATEGORIES.map((cat) => {
+        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3">
+          {SERVICE_CATEGORIES.map((cat, index) => {
             const isSelected = selectedCategory === cat.id;
 
             return (
-              <button
+              <ServiceCategoryCard
                 key={cat.id}
-                type="button"
+                category={cat}
+                index={index}
+                isSelected={isSelected}
                 onClick={() => {
                   const nextCat = isSelected ? 'all' : cat.id;
                   setSelectedCategory(nextCat);
@@ -486,19 +491,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
                     document.getElementById('technicians-section')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   }, 50);
                 }}
-                className={`p-3 rounded-2xl border text-center transition-all flex flex-col items-center justify-center gap-2 shadow-xs group cursor-pointer ${
-                  isSelected
-                    ? 'bg-blue-50/80 text-blue-900 border-blue-600 ring-2 ring-blue-600/30 shadow-md scale-105'
-                    : 'bg-white text-slate-700 border-slate-200 hover:border-blue-300 hover:bg-slate-50'
-                }`}
-              >
-                <div className="group-hover:scale-110 transition-transform">
-                  <CategoryLogo categoryId={cat.id} size="md" />
-                </div>
-                <span className="text-[11px] font-bold leading-tight line-clamp-2 max-w-full text-center">
-                  {cat.name}
-                </span>
-              </button>
+              />
             );
           })}
         </div>

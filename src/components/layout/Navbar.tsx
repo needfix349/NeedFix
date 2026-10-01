@@ -30,6 +30,8 @@ import { LocationSelectionModal } from '../common/LocationSelectionModal';
 import { PWAInstallButton } from '../common/PWAInstallButton';
 import { EditProfileModal } from '../common/EditProfileModal';
 import { DeleteAccountModal } from '../common/DeleteAccountModal';
+import { EditTechnicianProfileModal } from '../technician/EditTechnicianProfileModal';
+import { storageService } from '../../services/storage';
 
 interface NavbarProps {
   currentUser: UserProfile | null;
@@ -68,10 +70,24 @@ export const Navbar: React.FC<NavbarProps> = ({
 }) => {
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [showTechnicianEditModal, setShowTechnicianEditModal] = useState(false);
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [isLocatingGPS, setIsLocatingGPS] = useState(false);
   const [gpsNotification, setGpsNotification] = useState<string | null>(null);
   const [showLocationModal, setShowLocationModal] = useState(false);
+
+  // Active technician profile for full business & logo editing
+  const activeTechProfile =
+    technicianProfile ||
+    (currentUser?.role === 'technician'
+      ? storageService.getTechnicians().find(
+          (t) =>
+            t.userId === currentUser.id ||
+            t.id === currentUser.id ||
+            (currentUser.technicianId && t.id === currentUser.technicianId) ||
+            (currentUser.mobile && (t.mobile === currentUser.mobile || t.whatsappNumber === currentUser.mobile))
+        )
+      : null);
 
   const effectiveLocation = currentUser?.location || guestLocation;
 
@@ -322,23 +338,43 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
 
                     <div className="space-y-1 text-xs font-semibold text-slate-700">
-                      <button
-                        type="button"
-                        id="navbar-change-name-btn"
-                        onClick={() => {
-                          setShowProfileMenu(false);
-                          setShowEditProfileModal(true);
-                        }}
-                        className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700 cursor-pointer transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <User size={14} className="text-blue-600" />
-                          <span>Change / Edit Name</span>
-                        </div>
-                        <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
-                          Edit
-                        </span>
-                      </button>
+                      {currentUser.role === 'technician' ? (
+                        <button
+                          type="button"
+                          id="navbar-edit-tech-profile-btn"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowTechnicianEditModal(true);
+                          }}
+                          className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <Briefcase size={14} className="text-blue-600" />
+                            <span>Edit Technician Profile & Details</span>
+                          </div>
+                          <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                            Edit
+                          </span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          id="navbar-change-name-btn"
+                          onClick={() => {
+                            setShowProfileMenu(false);
+                            setShowEditProfileModal(true);
+                          }}
+                          className="w-full text-left p-2 hover:bg-slate-100 rounded-xl flex items-center justify-between text-slate-700 cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-2">
+                            <User size={14} className="text-blue-600" />
+                            <span>Change / Edit Name</span>
+                          </div>
+                          <span className="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">
+                            Edit
+                          </span>
+                        </button>
+                      )}
 
                       <button
                         onClick={() => {
@@ -485,6 +521,17 @@ export const Navbar: React.FC<NavbarProps> = ({
             if (onUpdateUser) {
               onUpdateUser(updated);
             }
+          }}
+        />
+      )}
+
+      {showTechnicianEditModal && activeTechProfile && (
+        <EditTechnicianProfileModal
+          isOpen={showTechnicianEditModal}
+          onClose={() => setShowTechnicianEditModal(false)}
+          technician={activeTechProfile}
+          onUpdated={(updated) => {
+            setShowTechnicianEditModal(false);
           }}
         />
       )}

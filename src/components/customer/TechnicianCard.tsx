@@ -18,6 +18,7 @@ import { storageService } from '../../services/storage';
 import { deviceSecurityService } from '../../services/deviceSecurityService';
 import { SERVICE_CATEGORIES } from '../../data/categories';
 import { CategoryLogo } from '../common/CategoryLogo';
+import { getTechnicianDisplayPhoto, getTechnicianInitials } from '../../utils/technicianAvatar';
 
 interface TechnicianCardProps {
   technician: TechnicianProfile;
@@ -41,15 +42,24 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
   const category = SERVICE_CATEGORIES.find((c) => c.id === technician.categoryId);
   const techCode = technician.technicianCode || `NF-TECH-${technician.id.slice(-4).toUpperCase()}`;
 
-  // Calculate real GPS distance
-  const distanceKm = userLocation
-    ? calculateDistanceKm(
-        userLocation.latitude,
-        userLocation.longitude,
-        technician.location.latitude,
-        technician.location.longitude
-      )
-    : null;
+  // Calculate real GPS distance safely
+  const distanceKm =
+    userLocation &&
+    technician.location &&
+    !isNaN(Number(userLocation.latitude)) &&
+    !isNaN(Number(userLocation.longitude)) &&
+    !isNaN(Number(technician.location.latitude)) &&
+    !isNaN(Number(technician.location.longitude))
+      ? calculateDistanceKm(
+          Number(userLocation.latitude),
+          Number(userLocation.longitude),
+          Number(technician.location.latitude),
+          Number(technician.location.longitude)
+        )
+      : null;
+
+  // Genuine photo check: if technician has not selected their icon/photo, show NO person photo or dummy logo
+  const displayPhoto = getTechnicianDisplayPhoto(technician.profilePhotoUrl, technician.companyLogoUrl);
 
   const handleCallClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -173,11 +183,17 @@ export const TechnicianCard: React.FC<TechnicianCardProps> = ({
         {/* Profile Info Row */}
         <div className="flex items-start gap-3.5">
           <div className="relative shrink-0">
-            <img
-              src={technician.profilePhotoUrl || technician.companyLogoUrl}
-              alt={technician.companyName || technician.fullName}
-              className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs group-hover:scale-105 transition-transform"
-            />
+            {displayPhoto ? (
+              <img
+                src={displayPhoto}
+                alt={technician.companyName || technician.fullName}
+                className="w-16 h-16 rounded-2xl object-cover border border-slate-200 shadow-xs group-hover:scale-105 transition-transform"
+              />
+            ) : (
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-slate-100 to-slate-200 border border-slate-200 flex items-center justify-center text-slate-700 font-bold text-base shadow-2xs group-hover:scale-105 transition-transform select-none">
+                {getTechnicianInitials(technician.fullName, technician.companyName)}
+              </div>
+            )}
             {technician.isOnline ? (
               <span
                 title="Live Now & Accepting Leads"

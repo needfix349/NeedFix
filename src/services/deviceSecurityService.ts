@@ -401,7 +401,7 @@ class DeviceSecurityService {
   }): Promise<DeviceSecurityStatus> {
     const deviceId = this.getDeviceId();
     const ip = await this.getRealIPAddress();
-    const defaultBlockedMessage = "Your account/device has been blocked by Admin. Access denied until unblocked.";
+    const defaultBlockedMessage = "Your ID is Blocked from Admin";
 
     // 1. Check local blacklist cache for instant zero-latency freeze
     const localBlock = storageService.isDeviceOrIpBlocked(deviceId, ip);
@@ -701,7 +701,48 @@ class DeviceSecurityService {
       );
     }
 
-    // 2. Sync to Supabase PostgreSQL 'blocked_devices' table
+    // 2. Sync to Central Server API
+    try {
+      fetch('/api/blocked-devices', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(record),
+      }).catch((e) => console.warn('API /api/blocked-devices post error:', e));
+
+      if (params.targetType === 'technician') {
+        const techUpdate = {
+          isBlocked: true,
+          status: 'blocked',
+          isOnline: false,
+          rejectionReason: record.reason,
+        };
+        if (params.targetId) {
+          fetch(`/api/technicians/${params.targetId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(techUpdate),
+          }).catch(() => {});
+        }
+        if (params.uniqueId) {
+          fetch(`/api/technicians/${params.uniqueId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(techUpdate),
+          }).catch(() => {});
+        }
+      } else {
+        const target = params.targetId || params.uniqueId;
+        fetch(`/api/customers/${target}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isBlocked: true, status: 'blocked' }),
+        }).catch(() => {});
+      }
+    } catch (apiErr) {
+      console.warn('API block sync error:', apiErr);
+    }
+
+    // 3. Sync to Supabase PostgreSQL 'blocked_devices' table
     if (isSupabaseConfigured()) {
       try {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -774,7 +815,27 @@ class DeviceSecurityService {
       }
     }
 
-    // 2. Remove from Supabase PostgreSQL
+    // 2. Sync unblock to Central Server API
+    try {
+      fetch(`/api/blocked-devices/${params.uniqueId}`, { method: 'DELETE' }).catch(() => {});
+      if (params.targetType === 'technician' || params.uniqueId.startsWith('TECH-')) {
+        fetch(`/api/technicians/${params.uniqueId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isBlocked: false, status: 'approved' }),
+        }).catch(() => {});
+      } else {
+        fetch(`/api/customers/${params.uniqueId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ isBlocked: false }),
+        }).catch(() => {});
+      }
+    } catch (apiErr) {
+      console.warn('API unblock error:', apiErr);
+    }
+
+    // 3. Remove from Supabase PostgreSQL
     if (isSupabaseConfigured()) {
       try {
         const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

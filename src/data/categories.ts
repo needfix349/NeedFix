@@ -7,8 +7,8 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     name: 'AC Technician & Gas Refill',
     icon: '❄️',
     lucideIconName: 'Fan',
-    description: 'AC Installation, gas refilling (R32/R410A), cooling repair, deep servicing & maintenance',
-    popularServices: ['AC Deep Servicing', 'Gas Refilling (R32/R410A)', 'AC Installation & Uninstallation', 'PCB Circuit Repair', 'Cooling Coil Replacement'],
+    description: 'Split & window AC repair, deep jet pump servicing, R32/R410A gas refilling & PCB repair',
+    popularServices: ['AC Deep Jet Servicing', 'Gas Refilling (R32/R410A)', 'AC Installation & Uninstallation', 'PCB Circuit Board Repair', 'Cooling Coil Replacement'],
     badge: 'Popular',
   },
   // 2. Electrician & Wiring
@@ -17,37 +17,38 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     name: 'Electrician & Wiring',
     icon: '⚡',
     lucideIconName: 'Zap',
-    description: 'Switchboard wiring, short circuit fixes, fan repair, inverter setup & light fitting',
-    popularServices: ['Short Circuit Repair', 'Switch & Socket Replacement', 'Ceiling Fan Installation', 'Inverter & Battery Wiring', 'MCB Tripping Resolution'],
+    description: 'Complete home electrical wiring, switchboard fixing, short circuits, MCB repair & lighting',
+    popularServices: ['Short Circuit Repair', 'Switch & Socket Replacement', 'Ceiling Fan Installation', 'MCB Tripping Resolution', 'Full House Electrical Rewiring'],
     badge: 'Emergency',
   },
-  // 3. CCTV & Security Installer
-  {
-    id: 'cctv-security',
-    name: 'CCTV & Security Installer',
-    icon: '📹',
-    lucideIconName: 'Camera',
-    description: 'HD/IP Camera installation, DVR/NVR setup, video door bells & biometric systems',
-    popularServices: ['4-Channel CCTV Setup', 'IP Camera WiFi Configuration', 'DVR/Hard Disk Replacement', 'Biometric Access Control', 'Video Door Phone Setup'],
-  },
-  // 4. Plumber & Water Motor
+  // 3. Plumber (Repair & Installation)
   {
     id: 'plumber',
-    name: 'Plumber & Water Motor',
+    name: 'Plumber (Repair & Installation)',
     icon: '🔧',
     lucideIconName: 'Wrench',
-    description: 'Pipe leakage repair, tap fixing, water motor pump, drain unclogging & sanitary setup',
-    popularServices: ['Tap Leakage & Replacement', 'Water Motor Pump Repair', 'Blocked Drain Cleaning', 'Bathroom Sanitary Fitting', 'Overhead Water Tank Cleaning'],
+    description: 'Tap leakage repair, water pipe fitting, pipeline blockage, sanitary ware & flush cistern repair',
+    popularServices: ['Tap Leakage & Replacement', 'Concealed Pipe Leak Detection', 'Drain & Bathroom Unclogging', 'Sanitary & Commode Fitting', 'Overhead Pipeline Repair'],
     badge: 'High Demand',
   },
-  // 5. Home Appliance Repair
+  // 4. Home Appliance Repair
   {
     id: 'home-appliance',
     name: 'Home Appliance Repair',
     icon: '🧺',
     lucideIconName: 'Tv',
-    description: 'Washing machine, refrigerator, microwave oven, geyser & chimney repair',
-    popularServices: ['Washing Machine Drum & Motor Repair', 'Refrigerator Gas Refill & Cooling', 'Microwave Magnetron Repair', 'Geyser Element Replacement', 'Kitchen Chimney Servicing'],
+    description: 'Double door refrigerator cooling, front & top load washing machine, microwave & chimney repair',
+    popularServices: ['Washing Machine Drum & Motor Repair', 'Refrigerator Gas Refill & Compressor', 'Microwave Heating Repair', 'Kitchen Chimney Deep Clean & Repair', 'Geyser Element Replacement'],
+    badge: 'Essential',
+  },
+  // 5. CCTV & Security Installer
+  {
+    id: 'cctv-security',
+    name: 'CCTV & Security Installer',
+    icon: '📹',
+    lucideIconName: 'Camera',
+    description: 'HD & IP CCTV cameras, WiFi smart cameras, DVR/NVR configuration, mobile live view & intercom',
+    popularServices: ['4-Channel & 8-Channel CCTV Setup', 'WiFi Smart PTZ Camera Installation', 'DVR Hard Drive & Power Supply Repair', 'Video Door Phone (VDP) Setup', 'Biometric Access Control'],
   },
   // 6. Taxi Driver & Cab
   {
@@ -55,46 +56,47 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     name: 'Taxi Driver & Cab',
     icon: '🚖',
     lucideIconName: 'Car',
-    description: 'Local city rides, outstation cabs, airport pick & drop, 24/7 emergency vehicle booking',
-    popularServices: ['Airport Pick & Drop', 'Outstation Round Trip', 'Hourly City Rental', 'Sedan & SUV Booking', 'Emergency 24x7 Cab'],
-    badge: '24x7 Cabs',
+    description: 'Local city rides, outstation round trips, airport drop/pickup & verified experienced drivers',
+    popularServices: ['Airport Pick & Drop', 'Outstation Round Trip Cabs', 'Full Day City Rental (8hr/80km)', 'Sedan & SUV Cab Booking', 'Emergency 24x7 Cab Service'],
+    badge: '24x7 Available',
   },
-  // 7. Tile & Marble Layer
+  // 7. Makeup Artist
   {
-    id: 'tile-marble-layer',
-    name: 'Tile & Marble Layer',
-    icon: '🧱',
-    lucideIconName: 'Layers',
-    description: 'Vitrified tiles, Italian marble flooring, bathroom tiling, granite polishing & grouting',
-    popularServices: ['Floor Tile Laying (Sq. Ft.)', 'Italian Marble Polishing', 'Bathroom Wall Tiling', 'Kitchen Granite Slab Fixing', 'Epoxy Grouting'],
-  },
-  // 8. Interior Designer
-  {
-    id: 'interior-designer',
-    name: 'Interior Designer',
-    icon: '🛋️',
+    id: 'makeup-artist',
+    name: 'Makeup Artist',
+    icon: '💄',
     lucideIconName: 'Sparkles',
-    description: '3D modular kitchen, wardrobe design, living room revamp, space planning & consultation',
-    popularServices: ['3D Modular Kitchen Design', 'Full Home Interior Consultation', 'Custom Wardrobe & TV Unit', 'Lighting & False Ceiling Plan', 'Furniture Layout Design'],
-    badge: 'Premium',
+    description: 'HD bridal makeup, airbrush makeup, party & reception makeover, saree draping & hairstyling',
+    popularServices: ['HD Bridal Makeover Package', 'Engagement & Reception Makeup', 'Party & Festival Glam Makeover', 'Professional Hair Styling', 'Airbrush Makeup'],
+    badge: 'Trending',
   },
-  // 9. Aluminum Fabricator
+  // 8. Mehndi Artist
   {
-    id: 'aluminum-fabricator',
-    name: 'Aluminum Fabricator',
-    icon: '🪟',
+    id: 'mehndi-artist',
+    name: 'Mehndi Artist',
+    icon: '🌿',
+    lucideIconName: 'Flower2',
+    description: 'Bridal mehndi, intricate Arabic designs, Rajasthani traditional, baby shower & guest henna cones',
+    popularServices: ['Full Hand Bridal Mehndi Package', 'Designer Arabic Front & Back Hand', 'Engagement Special Henna', 'Family & Guest Group Mehndi (Hourly)', 'Organic 100% Dark Stain Henna'],
+    badge: 'Specialist',
+  },
+  // 9. Car Mechanic
+  {
+    id: 'car-mechanic',
+    name: 'Car Mechanic',
+    icon: '🚗',
+    lucideIconName: 'Car',
+    description: 'Doorstep car servicing, brake pad replacement, battery jumpstart, clutch & engine diagnostics',
+    popularServices: ['Doorstep Periodic Car Service', 'Engine Oil & Filter Change', 'Brake Pad Replacement & Bleeding', 'Clutch Overhaul & Plate Change', 'Car Battery Jumpstart & Replacement'],
+  },
+  // 10. Carpenter & Woodwork
+  {
+    id: 'carpenter-woodwork',
+    name: 'Carpenter & Woodwork',
+    icon: '🪚',
     lucideIconName: 'Hammer',
-    description: 'Aluminum sliding windows, office partitions, mosquito mesh, doors & ACP sheet work',
-    popularServices: ['Sliding Window Fabrication', 'Office Glass Partition Work', 'Mosquito Mesh Aluminum Frame', 'Louvered Ventilation Windows', 'ACP Sheet Cladding'],
-  },
-  // 10. Glass Technician
-  {
-    id: 'glass-technician',
-    name: 'Glass Technician',
-    icon: '🪞',
-    lucideIconName: 'Maximize2',
-    description: 'Toughened glass partitions, shower cubicles, mirror beveling, spider fittings & railing',
-    popularServices: ['Toughened Glass Installation', 'Bathroom Shower Enclosure', 'Designer LED Mirror Fitting', 'Balcony Glass Railing', 'Patch Fitting Glass Doors'],
+    description: 'Door lock & hinge repair, custom modular wardrobe, bed assembly, modular kitchen woodwork & polish',
+    popularServices: ['Door Lock, Latch & Hinge Repair', 'Bed, Sofa & Wardrobe Assembly', 'Cabinet & Drawer Telescopic Channels', 'Custom Furniture Fabrication', 'Wood Polish & PU Finish'],
   },
   // 11. Painter
   {
@@ -102,64 +104,63 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     name: 'Painter',
     icon: '🎨',
     lucideIconName: 'Paintbrush',
-    description: 'Interior & exterior painting, texture wall art, waterproofing, wood polish & putty work',
-    popularServices: ['Full Home Fresh Painting', 'Royal Luxury Texture Wall', 'Waterproofing & Damp Proofing', 'PU Wood Polish', 'Rental Whitewash Package'],
+    description: 'Interior & exterior house painting, royal texture walls, waterproofing damp cure & putty work',
+    popularServices: ['Full Home Fresh Painting', 'Royal Luxury Texture Feature Wall', 'Waterproofing & Wall Seepage Fix', 'Rental Whitewash Package', 'Door & Window Enamel Painting'],
   },
-  // 12. Mehndi Artist
+  // 12. RO Technician
   {
-    id: 'mehndi-artist',
-    name: 'Mehndi Artist',
-    icon: '🌿',
-    lucideIconName: 'Flower2',
-    description: 'Bridal mehndi, Arabic henna designs, engagement, festival & guest party packages',
-    popularServices: ['Full Bridal Mehndi Package', 'Arabic Front & Back Hand', 'Engagement Special Design', 'Guest Group Mehndi (Hourly)', 'Organic Dark Henna Cone'],
+    id: 'ro-technician',
+    name: 'RO Technician',
+    icon: '💧',
+    lucideIconName: 'Droplets',
+    description: 'Water purifier filter replacement, RO membrane repair, TDS calibration & installation',
+    popularServices: ['Full RO Filter Kit Replacement', 'RO Booster Pump & SMPS Repair', 'Membrane Replacement & TDS Tune', 'Water Purifier Uninstallation/Install', 'UV & Alkaline Mineral Cartridge Add'],
   },
-  // 13. Makeup Artist
+  // 13. Doorstep Bike Repair
   {
-    id: 'makeup-artist',
-    name: 'Makeup Artist',
-    icon: '💄',
+    id: 'doorstep-bike-repair',
+    name: 'Doorstep Bike Repair',
+    icon: '🏍️',
+    lucideIconName: 'Bike',
+    description: 'Doorstep two-wheeler servicing, engine oil change, tubeless puncture, brake adjust & tuning',
+    popularServices: ['Doorstep General Bike Service', 'Engine Oil Change & Filter Clean', 'Tubeless Tire Puncture Repair', 'Brake Shoes & Cable Replacement', 'Chain Lubrication & Carburetor Tune'],
+    badge: 'At Doorstep',
+  },
+  // 14. Mobile Repair
+  {
+    id: 'mobile-repair',
+    name: 'Mobile Repair',
+    icon: '📱',
+    lucideIconName: 'Smartphone',
+    description: 'Screen/display glass replacement, battery change, charging port fix & motherboard repair',
+    popularServices: ['Original OLED/LCD Screen Change', 'Battery Health Replacement', 'Charging Port & Mic Repair', 'Water Damage Restoration', 'Camera & Speaker Repair'],
+  },
+  // 15. Mason / Civil Contractor
+  {
+    id: 'mason-civil-contractor',
+    name: 'Mason / Civil Contractor',
+    icon: '🧱',
+    lucideIconName: 'Building2',
+    description: 'Brick masonry, wall plastering, concrete repair, room partition & home renovation contractor',
+    popularServices: ['Brickwork & Wall Construction', 'Sand & Cement Plastering Work', 'Tile & Marble Base Concrete Laying', 'Wall Dismantling & Structural Fix', 'Waterproofing Plaster Application'],
+  },
+  // 16. Tile & Marble Layer
+  {
+    id: 'tile-marble-layer',
+    name: 'Tile & Marble Layer',
+    icon: '🪨',
+    lucideIconName: 'Layers',
+    description: 'Vitrified floor tiles, Italian marble laying, kitchen granite counter slabs & epoxy grouting',
+    popularServices: ['Vitrified Floor Tile Laying', 'Italian Marble Laying & Mirror Polish', 'Bathroom Wall & Floor Tiling', 'Kitchen Granite Countertop Fitting', 'Epoxy Waterproof Grouting'],
+  },
+  // 17. Water Tank Cleaning
+  {
+    id: 'water-tank-cleaning',
+    name: 'Water Tank Cleaning',
+    icon: '🚰',
     lucideIconName: 'Sparkles',
-    description: 'HD Bridal makeup, party look, hairstyling, saree draping & airbrush makeover',
-    popularServices: ['HD Bridal Makeover', 'Engagement / Reception Look', 'Party & Festival Makeup', 'Hair Styling & Saree Draping', 'Airbrush Makeup'],
-    badge: 'Trending',
-  },
-  // 14. Marriage Hall / Event Decorator
-  {
-    id: 'event-decorator',
-    name: 'Marriage Hall / Event Decorator',
-    icon: '🎪',
-    lucideIconName: 'PartyPopper',
-    description: 'Wedding stage setup, flower decoration, entry gate arches, lighting & mandap themes',
-    popularServices: ['Grand Wedding Stage Decor', 'Fresh Flower Mandap & Entry', 'Haldi & Mehndi Theme Setup', 'Ambient Lighting & Truss', 'Balloon & Floral Photo Booth'],
-  },
-  // 15. Wallpaper & Panel Installer
-  {
-    id: 'wallpaper-panel-installer',
-    name: 'Wallpaper & Panel Installer',
-    icon: '📜',
-    lucideIconName: 'Wallpaper',
-    description: '3D luxury wallpapers, PVC wall panels, fluted charcoal louvers, acoustic padding',
-    popularServices: ['Custom 3D Wallpaper Pasting', 'PVC Charcoal Fluted Louvers', 'Wooden Texture Wall Cladding', 'Acoustic Soundproofing Panels', 'Custom Wall Mural Fitting'],
-  },
-  // 16. False Ceiling Contractor
-  {
-    id: 'false-ceiling-contractor',
-    name: 'False Ceiling Contractor',
-    icon: '🏛️',
-    lucideIconName: 'Building',
-    description: 'Gypsum board ceiling, POP cove design, grid ceiling, wooden rafters & LED profile channels',
-    popularServices: ['Gypsum Board Ceiling (Per Sq. Ft.)', 'POP Modern Cove & LED Profile', 'Commercial Grid Tile Ceiling', 'Wooden Louver Rafter Ceiling', 'Moisture Resistant Bathroom Ceiling'],
-  },
-  // 17. Key Lock Maker
-  {
-    id: 'key-lock-maker',
-    name: 'Key Lock Maker',
-    icon: '🔑',
-    lucideIconName: 'Key',
-    description: 'Emergency door lock opening, duplicate computerized keys, smart digital lock fixing',
-    popularServices: ['Emergency Lockout Door Opening', 'Duplicate Computerized Key Making', 'Smart Biometric Lock Installation', 'Car Transponder Key Duplication', 'Heavy Master Padlock Servicing'],
-    badge: 'Quick Emergency',
+    description: 'Underground & overhead Sintex tank high-pressure jet cleaning, sludge vacuum & UV sterilization',
+    popularServices: ['Overhead Sintex Tank Jet Cleaning', 'Underground Sump Deep Clean & Sludge Pump', 'UV Antibacterial Tank Treatment', 'Chemical Free Mechanized Sanitization', 'Pipeline Flushing & Bio-cleaning'],
   },
   // 18. Inverter & Battery Mechanic
   {
@@ -167,108 +168,116 @@ export const SERVICE_CATEGORIES: ServiceCategory[] = [
     name: 'Inverter & Battery Mechanic',
     icon: '🔋',
     lucideIconName: 'BatteryCharging',
-    description: 'Home inverter repair, tubular battery water top-up, backup load test & solar inverter setup',
-    popularServices: ['Inverter PCB Repair & Servicing', 'Battery Acid & Distilled Water Refill', 'Inverter Wiring & MCB Connection', 'Solar Hybrid Inverter Installation', 'Battery Health & Backup Load Check'],
-    badge: 'Essential',
+    description: 'Home inverter PCB repair, tubular battery distilled water refill, backup test & solar hybrid setup',
+    popularServices: ['Inverter PCB Board Repair', 'Tubular Battery Acid & Water Topup', 'Inverter Wiring & Dedicated MCB', 'Battery Backup Load Capacity Test', 'Solar Inverter & Panel Wiring'],
   },
-  // 19. Carpenter & Woodwork
+  // 19. Laptop / Computer Repair
   {
-    id: 'carpenter-woodwork',
-    name: 'Carpenter & Woodwork',
-    icon: '🪚',
-    lucideIconName: 'Hammer',
-    description: 'Furniture repair, door latch & hinge fixing, modular wardrobe assembly, drawer channels & polish',
-    popularServices: ['Door Lock & Hinge Repair', 'Bed & Wardrobe Assembly', 'Cabinet & Drawer Channel Fixing', 'Custom Wooden Furniture Making', 'Wood Polishing & Touch-up'],
-    badge: 'High Demand',
+    id: 'laptop-computer-repair',
+    name: 'Laptop / Computer Repair',
+    icon: '💻',
+    lucideIconName: 'Laptop',
+    description: 'Laptop motherboard chip level repair, screen & keyboard replacement, SSD upgrade & OS install',
+    popularServices: ['Motherboard Chip-Level Repair', 'Laptop Screen & Hinge Replacement', 'High-Speed SSD Upgrade & RAM Boost', 'Keyboard & Trackpad Replacement', 'Windows / Mac OS Fresh Install & Antivirus'],
   },
-  // 20. Doorstep Bike Repair
+  // 20. Welder & Welding Work
   {
-    id: 'doorstep-bike-repair',
-    name: 'Doorstep Bike Repair',
-    icon: '🏍️',
-    lucideIconName: 'Bike',
-    description: 'Two-wheeler doorstep servicing, engine oil change, puncture fix, brake adjustment & breakdown assistance',
-    popularServices: ['Engine Oil Change & Filter Clean', 'Brake Pad & Cable Replacement', 'Doorstep Tubeless Puncture Fix', 'Carburetor & Spark Plug Tuning', 'Chain Lubrication & Tightening'],
-    badge: 'At Your Door',
+    id: 'welder-welding-work',
+    name: 'Welder & Welding Work',
+    icon: '👨‍🏭',
+    lucideIconName: 'Flame',
+    description: 'Iron safety gates, window safety grills, balcony railing, shed structure & on-site arc welding',
+    popularServices: ['Iron Main Gate & Railing Welding', 'Window Safety Grill Fabrication', 'Shed Tin Structure Welding', 'Broken Hinge & Door Frame Re-welding', 'Stainless Steel (SS) Railing Work'],
   },
-  // 21. Home Tuition / Personal Tutor
-  {
-    id: 'home-tuition',
-    name: 'Home Tuition / Personal Tutor',
-    icon: '📚',
-    lucideIconName: 'GraduationCap',
-    description: 'Class 1-12 all subjects, CBSE/ICSE, competitive exams, spoken English & 1-on-1 home tutors',
-    popularServices: [
-      'Class 1st to 8th (All Subjects)',
-      'Class 9th & 10th (Maths & Science)',
-      'Class 11th & 12th (Physics/Chem/Maths)',
-      'Spoken English & Communication',
-      '1-on-1 Personalized Home Mentoring',
-    ],
-    badge: 'Education',
-  },
-  // 22. Goods Transport / Pickup (Chota Hathi)
-  {
-    id: 'goods-transport',
-    name: 'Goods Transport / Pickup (Chota Hathi)',
-    icon: '🚚',
-    lucideIconName: 'Truck',
-    description: 'Tata Ace (Chota Hathi), pickup vans, house shifting, commercial cargo & intra-city logistics',
-    popularServices: [
-      'Chota Hathi (Tata Ace) Local Trip',
-      'House & Room Shifting',
-      'Commercial Goods Delivery',
-      'Inter-city Transport',
-      'Urgent Cargo Pickup & Drop',
-    ],
-    badge: 'Logistics',
-  },
-  // 23. Cleaner / Maid
+  // 21. Cleaner / Maid
   {
     id: 'cleaner-maid',
     name: 'Cleaner / Maid',
     icon: '🧹',
     lucideIconName: 'Sparkles',
-    description: 'Full house deep cleaning, daily maid, bathroom sanitization, kitchen degreasing & housekeeping',
-    popularServices: [
-      'Full Home Deep Cleaning',
-      'Bathroom & Toilet Deep Clean',
-      'Kitchen Deep Cleaning & Degreasing',
-      'Daily House Maid & Floor Mopping',
-      'Sofa & Carpet Shampoo Cleaning',
-    ],
-    badge: 'Cleaning',
+    description: 'Full house deep cleaning, kitchen grease removal, bathroom sanitization & regular maid support',
+    popularServices: ['Full Home Deep Cleaning', 'Bathroom & Toilet Tile Scrub Clean', 'Modular Kitchen Degreasing', 'Sofa & Carpet Foam Shampooing', 'Balcony & Floor Scrubbing Machine'],
   },
-  // 24. Babysitter / Nurse
-  {
-    id: 'babysitter-nurse',
-    name: 'Babysitter / Nurse',
-    icon: '👶',
-    lucideIconName: 'HeartHandshake',
-    description: 'Certified infant care, professional babysitters, elderly patient nursing, day & night nanny assistance',
-    popularServices: [
-      'Infant & Toddler Babysitting',
-      'Elderly Patient Care Assistant',
-      'Post-Surgery Nursing Support',
-      'Full-Day / 24-Hour Nanny',
-      'Newborn Baby Care & Mother Assistance',
-    ],
-    badge: 'Care',
-  },
-  // 25. Packers & Movers Helper
+  // 22. Packers & Movers Helper
   {
     id: 'packers-movers-helper',
     name: 'Packers & Movers Helper',
     icon: '📦',
     lucideIconName: 'Package',
-    description: 'Household luggage packing, loading & unloading helpers, carton bubble wrapping, shifting manpower',
-    popularServices: [
-      'Loading & Unloading Helper',
-      'Heavy Furniture Shifting & Dismantling',
-      'Carton Box Bubble Packing & Taping',
-      'Intra-City House Shifting Labor',
-      'Luggage Transport & Relocation Assistance',
-    ],
-    badge: 'Moving',
+    description: 'Household shifting helpers, heavy furniture loading/unloading, bubble wrap carton packing',
+    popularServices: ['Loading & Unloading Helpers', 'Bubble Wrap & Corrugated Carton Packing', 'Heavy Furniture Dismantling & Shifting', 'Local Intra-City Relocation Labor', 'Luggage & Fragile Goods Packing'],
+  },
+  // 23. False Ceiling Contractor
+  {
+    id: 'false-ceiling-contractor',
+    name: 'False Ceiling Contractor',
+    icon: '🏛️',
+    lucideIconName: 'Building',
+    description: 'Gypsum board false ceiling, modern POP cove lighting, grid ceiling & acoustic channels',
+    popularServices: ['Gypsum Board Ceiling (Per Sq. Ft.)', 'POP Modern Cove & LED Profile', 'Commercial Grid Tile Ceiling', 'Wooden Louver Rafter Ceiling', 'Moisture Resistant Bathroom Ceiling'],
+  },
+  // 24. Aluminum Fabricator
+  {
+    id: 'aluminum-fabricator',
+    name: 'Aluminum Fabricator',
+    icon: '🪟',
+    lucideIconName: 'Hammer',
+    description: 'Aluminum sliding windows, office toughened glass partitions, mosquito net frames & doors',
+    popularServices: ['Sliding Window Fabrication (2 & 3 Track)', 'Office Partition & Aluminum Doors', 'Stainless Steel Mosquito Net Mesh', 'Louvered Bathroom Windows', 'ACP Sheet Exterior Cladding'],
+  },
+  // 25. Wallpaper & Panel Installer
+  {
+    id: 'wallpaper-panel-installer',
+    name: 'Wallpaper & Panel Installer',
+    icon: '📜',
+    lucideIconName: 'Wallpaper',
+    description: '3D customized wallpapers, PVC fluted charcoal louvers, acoustic wall padding & wainscoting',
+    popularServices: ['Custom 3D Wallpaper Pasting', 'PVC Charcoal Fluted Louvers', 'Wooden Texture Wall Cladding', 'Acoustic Soundproofing Wall Panels', 'Custom Wall Mural & Border Fitting'],
+  },
+  // 26. Goods Transport / Pickup (Chota Hathi)
+  {
+    id: 'goods-transport',
+    name: 'Goods Transport / Pickup (Chota Hathi)',
+    icon: '🚚',
+    lucideIconName: 'Truck',
+    description: 'Tata Ace (Chota Hathi), pickup vehicles, room shifting, commercial cargo delivery & mini trucks',
+    popularServices: ['Chota Hathi (Tata Ace) Local Trip', 'House & Room Shifting Transport', 'Commercial Shop Goods Delivery', 'Inter-City Highway Cargo Pickup', 'Urgent Doorstep Logistics Truck'],
+  },
+  // 27. Key Lock Maker
+  {
+    id: 'key-lock-maker',
+    name: 'Key Lock Maker',
+    icon: '🔑',
+    lucideIconName: 'Key',
+    description: 'Emergency door lock opening, duplicate computerized keys, smart digital lock installation',
+    popularServices: ['Emergency Lockout Door Opening', 'Duplicate Computerized Key Making', 'Smart Biometric Lock Installation', 'Car Transponder Key Duplication', 'Heavy Master Padlock Servicing'],
+    badge: 'Emergency',
+  },
+  // 28. Interior Designer
+  {
+    id: 'interior-designer',
+    name: 'Interior Designer',
+    icon: '🛋️',
+    lucideIconName: 'Sparkles',
+    description: 'Modular kitchen 3D layout, bedroom luxury wardrobe, living room makeover & full architecture',
+    popularServices: ['3D Modular Kitchen Design', 'Full Home Interior Consultation', 'Custom Wardrobe & TV Unit Plan', 'Lighting & False Ceiling Architecture', 'Complete Residential Turnkey Project'],
+  },
+  // 29. Babysitter / Nurse
+  {
+    id: 'babysitter-nurse',
+    name: 'Babysitter / Nurse',
+    icon: '👶',
+    lucideIconName: 'HeartHandshake',
+    description: 'Experienced infant babysitting, elderly patient attendant, post-operative nursing & nanny',
+    popularServices: ['Infant & Toddler Day Care Babysitting', 'Elderly Patient Bedside Nursing Attendant', 'Post-Surgery Home Care Support', 'Full-Day 12-Hour / 24-Hour Nanny', 'Mother & Newborn Care Assistance'],
+  },
+  // 30. Marriage Hall / Event Decorator
+  {
+    id: 'event-decorator',
+    name: 'Marriage Hall / Event Decorator',
+    icon: '🎪',
+    lucideIconName: 'PartyPopper',
+    description: 'Grand wedding stage decoration, fresh flower mandap setup, haldi/mehndi themes & ambient lighting',
+    popularServices: ['Grand Wedding Stage & Floral Backdrop', 'Fresh Flower Mandap & Entry Arch', 'Haldi & Mehndi Traditional Theme Setup', 'DJ Truss, Spotlights & Ambient Lighting', 'Balloon & Theme Birthday Party Decor'],
   },
 ];
