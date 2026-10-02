@@ -362,9 +362,6 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           <div>
             <h2 className="text-base font-bold font-display text-slate-900 flex items-center gap-2">
               <span>Explore {SERVICE_CATEGORIES.length} Service Categories</span>
-              <span className="text-[11px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full border border-blue-200">
-                25 Trades
-              </span>
             </h2>
             <p className="text-xs text-slate-500">
               Select any trade to see verified specialists active within your {searchRadiusKm} KM radius
@@ -474,7 +471,7 @@ export const CustomerHome: React.FC<CustomerHomeProps> = ({
           </div>
         </div>
 
-        <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3">
+        <div className="grid grid-cols-3 md:grid-cols-5 lg:grid-cols-6 gap-2.5 sm:gap-3">
           {SERVICE_CATEGORIES.map((cat, index) => {
             const isSelected = selectedCategory === cat.id;
 

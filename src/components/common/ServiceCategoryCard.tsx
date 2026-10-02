@@ -66,15 +66,15 @@ export const ServiceCategoryCard: React.FC<ServiceCategoryCardProps> = ({
     >
       {/* Small Numbered Circular Badge 1-30 in top-left matching reference image */}
       <span
-        className="absolute top-2 left-2 w-5 h-5 rounded-full text-white text-[10px] font-extrabold flex items-center justify-center shadow-xs select-none z-10"
+        className="absolute top-2 left-2 w-6 h-6 rounded-full text-white text-[11px] font-extrabold flex items-center justify-center shadow-xs select-none z-10"
         style={{ backgroundColor: accentColor }}
       >
         {index + 1}
       </span>
 
       {/* Large, Detailed & Professional Service Illustration with soft pastel circular background */}
-      <div className="w-20 h-16 sm:w-22 sm:h-18 flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shrink-0 mt-0.5 mb-1">
-        <CategoryLogo categoryId={category.id} size="lg" className="w-20 h-16 sm:w-22 sm:h-18" />
+      <div className="w-20 h-20 sm:w-24 sm:h-24 flex items-center justify-center transition-transform duration-200 group-hover:scale-105 shrink-0 mb-1">
+        <CategoryLogo categoryId={category.id} size="lg" className="w-20 h-20 sm:w-24 sm:h-24" />
       </div>
 
       {/* Bold Dark-Blue Category Name */}
@@ -84,7 +84,7 @@ export const ServiceCategoryCard: React.FC<ServiceCategoryCardProps> = ({
 
       {/* Small Colored Horizontal Underline Below the Name */}
       <span
-        className="w-7 h-1 rounded-full mt-1.5 shrink-0"
+        className="w-10 h-1 rounded-full mt-1.5 shrink-0"
         style={{ backgroundColor: accentColor }}
       />
     </button>
