@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Supabase SQL Fix - Copy</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: system-ui, -apple-system, sans-serif; background: #0f172a; color: #e2e8f0; }
+  main { max-width: 720px; margin: 0 auto; padding: 20px 16px 120px; }
+  h1 { font-size: 20px; margin: 0 0 8px; }
+  p, li { font-size: 15px; line-height: 1.5; color: #cbd5e1; }
+  ol { padding-left: 20px; }
+  pre { background: #020617; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; font-size: 12px; line-height: 1.5; overflow: auto; max-height: 50vh; white-space: pre; }
+  .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px; background: #0f172a; border-top: 1px solid #1e293b; }
+  button { width: 100%; max-width: 720px; display: block; margin: 0 auto; padding: 16px; font-size: 17px; font-weight: 700; border: 0; border-radius: 12px; background: #2563eb; color: #fff; cursor: pointer; }
+  button.done { background: #16a34a; }
+  .status { text-align: center; font-size: 13px; margin-top: 6px; color: #94a3b8; min-height: 18px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Supabase SQL Fix</h1>
+  <ol>
+    <li>Neeche wala <strong>Copy SQL</strong> button dabayein.</li>
+    <li>Supabase SQL Editor mein jo pehle se likha hai, sab delete kar dein.</li>
+    <li>Long press karke <strong>Paste</strong> karein, phir <strong>Run</strong> dabayein.</li>
+  </ol>
+  <p>Ise kitni bhi baar chala sakte hain. Koi data delete nahi hoga.</p>
+  <pre id="sql">Loading...</pre>
+</main>
+<div class="bar">
+  <button id="copy" type="button" disabled>Copy SQL</button>
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+</div>
+<script>
+  const pre = document.getElementById('sql');
+  const btn = document.getElementById('copy');
+  const status = document.getElementById('status');
+  let sqlText = '';
+
+  fetch('/supabase-fix.sql', { cache: 'no-store' })
+    .then((r) => { if (!r.ok) throw new Error('HTTP ' + r.status); return r.text(); })
+    .then((t) => { sqlText = t.trim() + '\n'; pre.textContent = sqlText; btn.disabled = false; })
+    .catch((e) => { pre.textContent = 'SQL load nahi hua: ' + e.message; });
+
+  function fallbackCopy(text) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.setAttribute('readonly', '');
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    ta.setSelectionRange(0, text.length);
+    const ok = document.execCommand('copy');
+    document.body.removeChild(ta);
+    return ok;
+  }
+
+  btn.addEventListener('click', async () => {
+    let ok = false;
+    try { await navigator.clipboard.writeText(sqlText); ok = true; }
+    catch { ok = fallbackCopy(sqlText); }
+    if (ok) {
+      btn.textContent = 'Copied!';
+      btn.classList.add('done');
+      status.textContent = 'Ab Supabase SQL Editor mein paste karke Run dabayein.';
+      setTimeout(() => { btn.textContent = 'Copy SQL'; btn.classList.remove('done'); }, 2500);
+    } else {
+      status.textContent = 'Copy nahi hua. Upar wale box mein long press karke Select all karein.';
+    }
+  });
+</script>
+</body>
+</html>

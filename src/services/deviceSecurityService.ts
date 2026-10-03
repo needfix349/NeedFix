@@ -1,4 +1,4 @@
-import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured, isUuid } from './supabaseClient';
 import { storageService } from './storage';
 import { CustomerRecord, BlockedDeviceRecord, DeviceSecurityStatus } from '../types';
 
@@ -359,7 +359,7 @@ class DeviceSecurityService {
       try {
         const { error } = await supabase.from('customers').upsert(
           {
-            id: customerRecord.id,
+            ...(isUuid(customerRecord.id) ? { id: customerRecord.id } : {}),
             customer_id: customerRecord.customerId,
             name: customerRecord.name,
             phone: customerRecord.phone || null,
@@ -665,8 +665,9 @@ class DeviceSecurityService {
     reason: string;
     adminName: string;
   }): Promise<boolean> {
-    const deviceId = params.deviceId || this.getDeviceId();
-    const ipAddress = params.ipAddress || (await this.getRealIPAddress());
+    // Never fall back to the admin's own device/IP — that would lock the admin out.
+    const deviceId = params.deviceId || params.uniqueId || params.targetId;
+    const ipAddress = params.ipAddress || '';
     const blockedAt = new Date().toISOString();
 
     const record: BlockedDeviceRecord = {
@@ -745,25 +746,37 @@ class DeviceSecurityService {
     // 3. Sync to Supabase PostgreSQL 'blocked_devices' table
     if (isSupabaseConfigured()) {
       try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        const validInstallId = [params.deviceId, record.deviceId, params.targetId]
-          .find((id) => id && isUuid.test(id));
-        if (validInstallId) {
-          await supabase.from('blocked_devices').insert({
-            installation_id: validInstallId,
-            reason: record.reason,
-            blocked_at: record.blockedAt || new Date().toISOString(),
-          });
+        const validInstallId = [params.deviceId, params.targetId].find((id) => isUuid(id));
+        const { error: blockInsertErr } = await supabase.from('blocked_devices').insert({
+          installation_id: validInstallId || null,
+          device_id: record.deviceId,
+          ip_address: params.ipAddress || null,
+          unique_id: params.uniqueId,
+          target_type: params.targetType,
+          target_name: params.name || params.uniqueId,
+          target_phone: params.phone || null,
+          reason: record.reason,
+          blocked_by: record.blockedBy,
+          blocked_at: blockedAt,
+        });
+        if (blockInsertErr) {
+          console.warn('Supabase blocked_devices insert error:', blockInsertErr.message);
         }
 
         // Update target record status in Supabase
         if (params.targetType === 'customer') {
-          await supabase
+          const custFilters = [
+            `id.eq.${params.targetId}`,
+            `customer_id.eq.${params.uniqueId}`,
+            params.phone ? `mobile_number.eq.${params.phone}` : null,
+          ].filter(Boolean).join(',');
+          const { error: custErr } = await supabase
             .from('customers')
-            .update({
-              is_blocked: true,
-            })
-            .eq('id', params.uniqueId);
+            .update({ is_blocked: true, status: 'blocked', blocked_reason: record.reason, blocked_at: blockedAt })
+            .or(custFilters);
+          if (custErr) {
+            await supabase.from('customers').update({ is_blocked: true }).or(custFilters);
+          }
         } else {
           await supabase
             .from('technicians')
@@ -838,19 +851,25 @@ class DeviceSecurityService {
     // 3. Remove from Supabase PostgreSQL
     if (isSupabaseConfigured()) {
       try {
-        const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-        if (isUuid.test(params.uniqueId)) {
-          await supabase
-            .from('blocked_devices')
-            .delete()
-            .or(`installation_id.eq.${params.uniqueId},id.eq.${params.uniqueId}`);
+        const { error: unblockDelErr } = await supabase
+          .from('blocked_devices')
+          .delete()
+          .or(
+            `unique_id.eq.${params.uniqueId},device_id.eq.${params.uniqueId},installation_id.eq.${params.uniqueId},id.eq.${params.uniqueId}`
+          );
+        if (unblockDelErr) {
+          console.warn('Supabase blocked_devices delete error:', unblockDelErr.message);
         }
 
         if (params.targetType === 'customer' || params.uniqueId.startsWith('CUST-')) {
-          await supabase
+          const custFilters = `customer_id.eq.${params.uniqueId},id.eq.${params.uniqueId},mobile_number.eq.${params.uniqueId}`;
+          const { error: custErr } = await supabase
             .from('customers')
-            .update({ is_blocked: false })
-            .eq('id', params.uniqueId);
+            .update({ is_blocked: false, status: 'active', blocked_reason: null, blocked_at: null })
+            .or(custFilters);
+          if (custErr) {
+            await supabase.from('customers').update({ is_blocked: false }).or(custFilters);
+          }
         } else {
           await supabase
             .from('technicians')
